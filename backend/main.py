@@ -35,6 +35,16 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     init_db()
+    try:
+        from database import SessionLocal, Student
+        db = SessionLocal()
+        if db.query(Student).count() == 0:
+            print("[*] Database is empty. Seeding initial demo data...")
+            from seed_data import run_seed
+            run_seed()
+        db.close()
+    except Exception as e:
+        print(f"Startup seed notice: {e}")
 
 # Routers (mounted directly and under /api for full compatibility)
 app.include_router(auth_router)
