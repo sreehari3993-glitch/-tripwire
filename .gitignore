@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.mypy_cache/
+.venv/
+venv/
+env/
+.env
+
+# Database (keep schema, not data)
+backend/tripwire.db
+
+# Node / Frontend
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+.npm/
+*.log
+
+# IDE / OS
+.vscode/settings.json
+.idea/
+*.DS_Store
+Thumbs.db
+desktop.ini
+
+# Generated validation cache (can be regenerated)
+backend/scripts/weight_validation_results.json
+backend/scripts/model_validation_results.json
+backend/scripts/weight_validation_report.md
+
+# Secrets
+backend/.env
+*.pem
+*.key
