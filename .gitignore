@@ -14,8 +14,8 @@ venv/
 env/
 .env
 
-# Database (keep schema, not data)
-backend/tripwire.db
+# Database
+# (tripwire.db is tracked for seamless cloud deployment)
 
 # Node / Frontend
 node_modules/
