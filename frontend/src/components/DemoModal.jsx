@@ -5,6 +5,7 @@ import {
   Shield, TrendingDown, TrendingUp, HelpCircle, ArrowRight
 } from 'lucide-react'
 import { StatusBadge, VelocityLabel } from './Shared'
+import { BASE_URL } from '../api/client'
 
 export default function DemoModal({ isOpen, onClose }) {
   const [stages, setStages] = useState([])
@@ -15,7 +16,7 @@ export default function DemoModal({ isOpen, onClose }) {
 
   useEffect(() => {
     // Fetch stages from backend demo API
-    fetch('http://localhost:8000/demo/stages')
+    fetch(`${BASE_URL}/demo/stages`)
       .then(r => r.json())
       .then(d => {
         if (d.stages) setStages(d.stages)
