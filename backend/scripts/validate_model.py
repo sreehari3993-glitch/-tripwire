@@ -2,19 +2,19 @@
 Tripwire DVI Model Validation — validate_model.py
 --------------------------------------------------
 Computes per-archetype precision, recall, and F1 score for the DVI alert system
-using the 50-student synthetic cohort across 7 behavioral archetypes.
+using the 50-student synthetic cohort across 7 behavioral archetypes from seed_data.py.
 
 Archetypes:
   POSITIVE (should trigger DVI >= 70):
-    - rapid_decline   : Rapid multi-signal collapse
-    - late_submission : Assignment procrastination cascade
-    - lms_ghost       : Suddenly invisible on LMS
+    - rapid_decline   : Rapid multi-signal collapse — must be caught
+    - monitoring      : Drifting into alert zone — proactive detection
   BORDERLINE (should appear in MONITORING 50-69 or catch a subset):
-    - slow_fade       : Gradual drift, some should alert
+    - slow_decline    : Gradual drift; early catch is the goal
+    - improver        : Improving, but may still have residual DVI
+    - recovery        : Post-intervention; gradual stabilization
   NEGATIVE (should NOT trigger DVI >= 70):
-    - normal          : Stable student
-    - excused         : Approved medical/official leave
-    - high_performer  : Consistently excellent, always low DVI
+    - normal          : Stable student — zero false positives expected
+    - excused         : Approved medical/official leave — should not be flagged
 
 Outputs:
   - JSON: backend/scripts/model_validation_results.json
@@ -151,7 +151,7 @@ def run_model_validation() -> dict:
             },
             "note": (
                 "Prototype classification thresholds are decision-support indicators, not "
-                "clinical diagnoses. Borderline archetypes (slow_fade) are intentionally "
+                "clinical diagnoses. Borderline archetypes (slow_decline, improver) are intentionally "
                 "caught mid-drift to enable early mentorship before full disengagement."
             )
         }

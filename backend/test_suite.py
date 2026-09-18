@@ -128,7 +128,48 @@ class TestDVIEngine(unittest.TestCase):
 
         self.assertIn("current_dvi", cf)
         self.assertIn("scenarios", cf)
+        self.assertIn("summary", cf)
+        self.assertIn("disclaimer", cf)
         self.assertIn("threshold", cf)
+
+    def test_dvi_not_frozen_post_intervention(self):
+        """DVI must not freeze to post_dvi; it must continue to dynamically compute from telemetry."""
+        from database import Intervention, TripwireAlert
+        student = self.db.query(Student).first()
+        self.assertIsNotNone(student)
+
+        # Retrieve or create an intervention for this student with an artificial post_dvi value
+        alert = self.db.query(TripwireAlert).filter(TripwireAlert.student_id == student.student_id).first()
+        if not alert:
+            alert = TripwireAlert(
+                student_id=student.student_id,
+                dvi_score=75.0,
+                status="active"
+            )
+            self.db.add(alert)
+            self.db.commit()
+
+        from datetime import datetime
+        inv = Intervention(
+            alert_id=alert.alert_id,
+            mentor_id="FAC001",
+            contact_date=datetime.now(),
+            outcome="Contacted",
+            notes="Test intervention",
+            post_dvi=12.3  # distinct artificial value
+        )
+        self.db.add(inv)
+        self.db.commit()
+
+        try:
+            result = dvi_engine.compute_dvi(self.db, student)
+            # DVI must be computed from smoothed component telemetry, NOT frozen to 12.3
+            self.assertEqual(result["dvi"], result["smoothed_dvi"])
+            self.assertNotEqual(result["dvi"], 12.3)
+        finally:
+            self.db.delete(inv)
+            self.db.commit()
+
 
 
 class TestDatabaseIntegrity(unittest.TestCase):
@@ -156,10 +197,10 @@ class TestDatabaseIntegrity(unittest.TestCase):
         self.assertGreater(len(alerts), 0, "No alerts found in database.")
 
     def test_student_archetypes_valid(self):
-        """Archetypes must be one of the known archetypes."""
+        """Archetypes must match the 7 archetypes produced by seed_data.py."""
         valid_archetypes = {
-            "rapid_decline", "slow_decline", "late_submission", "lms_ghost",
-            "recovery", "improver", "monitoring", "normal", "excused", "high_performer"
+            "normal", "improver", "slow_decline", "rapid_decline",
+            "excused", "recovery", "monitoring"
         }
         students = self.db.query(Student).all()
         for s in students:
@@ -211,6 +252,18 @@ class TestAuthAndSecurity(unittest.TestCase):
         blocked = client.post("/auth/login", data={"username": dummy_user, "password": "wrong_password_123"})
         self.assertEqual(blocked.status_code, 429)
         self.assertIn("Retry-After", blocked.headers)
+
+    def test_no_hardcoded_password_backdoor(self):
+        """Even for default faculty accounts, an incorrect password must always be rejected."""
+        client = TestClient(app)
+        res = client.post("/auth/login", data={"username": "FAC001", "password": "wrongpassword"})
+        self.assertEqual(res.status_code, 401)
+
+    def test_unregistered_account_without_demo_mode_rejected(self):
+        """Unregistered mentor login attempt must fail with 401 when DEMO_MODE is false."""
+        client = TestClient(app)
+        res = client.post("/auth/login", data={"username": "UNREGISTERED_FACULTY", "password": "tripwire123"})
+        self.assertEqual(res.status_code, 401)
 
 
 class TestAPIEndpoints(unittest.TestCase):
@@ -394,6 +447,7 @@ class TestAPIEndpoints(unittest.TestCase):
         data = res.json()
         self.assertEqual(data.get("total_stages"), 6)
         self.assertEqual(len(data.get("stages", [])), 6)
+        self.assertEqual(data.get("data_source"), "scripted_demo")
 
     def test_analytics_endpoints(self):
         """GET /analytics/model-validation, weight-validation, trust-score return reports."""
@@ -408,6 +462,151 @@ class TestAPIEndpoints(unittest.TestCase):
 
         res_trust = self.client.get("/analytics/trust-score")
         self.assertEqual(res_trust.status_code, 200)
+        data_trust = res_trust.json()
+        self.assertIn("status", data_trust)
+        self.assertIn("overall_trust_score", data_trust)
+
+    def test_trust_score_empty_state(self):
+        """When no feedback is recorded, GET /analytics/trust-score returns honest empty state without fake defaults."""
+        from unittest.mock import MagicMock
+        from database import get_db
+        from main import app
+
+        def override_empty_db():
+            mock_db = MagicMock()
+            mock_query = MagicMock()
+            mock_db.query.return_value = mock_query
+            mock_query.join.return_value.all.return_value = []
+            yield mock_db
+
+        app.dependency_overrides[get_db] = override_empty_db
+        try:
+            res = self.client.get("/analytics/trust-score")
+            self.assertEqual(res.status_code, 200)
+            data = res.json()
+            self.assertEqual(data["status"], "no_feedback_yet")
+            self.assertIsNone(data["overall_trust_score"])
+            self.assertEqual(data["total_feedback_count"], 0)
+            self.assertEqual(data["trust_score_trend"], [])
+            self.assertIsNone(data["false_positive_rate"])
+            self.assertIsNone(data["accurate_rate"])
+        finally:
+            app.dependency_overrides.pop(get_db, None)
+
+    def test_simulation_pitch_endpoints(self):
+        """P1: Live simulation endpoints test drift trigger, alert creation, recovery, and reset."""
+        res = self.client.get("/students", headers=self.auth_headers)
+        students = res.json()["students"]
+        # Pick any normal student
+        test_student = next(s for s in students if s["status"] in ["normal", "monitoring"])
+        stu_id = test_student["student_id"]
+
+        # 1. Simulate drift
+        drift_res = self.client.post(f"/students/{stu_id}/simulate-drift", headers=self.auth_headers)
+        self.assertEqual(drift_res.status_code, 200)
+        d_data = drift_res.json()
+        self.assertTrue(d_data["success"])
+        self.assertGreaterEqual(d_data["dvi"], 70.0)
+        self.assertTrue(d_data["alert_id"] is not None)
+
+        # 2. Simulate recovery
+        rec_res = self.client.post(f"/students/{stu_id}/simulate-recovery", headers=self.auth_headers)
+        self.assertEqual(rec_res.status_code, 200)
+        r_data = rec_res.json()
+        self.assertTrue(r_data["success"])
+        self.assertLess(r_data["dvi"], 65.0)
+
+        # 3. Simulate reset
+        reset_res = self.client.post(f"/students/{stu_id}/simulate-reset", headers=self.auth_headers)
+        self.assertEqual(reset_res.status_code, 200)
+        rst_data = reset_res.json()
+        self.assertTrue(rst_data["success"])
+
+
+class TestAccessControlIDOR(unittest.TestCase):
+    """Verifies that mentors cannot access or modify students/alerts belonging to other mentors (mitigating IDOR)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.client = TestClient(app)
+        db = SessionLocal()
+        try:
+            # Ensure FAC002 exists
+            m2 = db.query(Mentor).filter(Mentor.mentor_id == "FAC002").first()
+            if not m2:
+                m2 = Mentor(
+                    mentor_id="FAC002",
+                    name="Dr. Sarah Thomas",
+                    password_hash=pwd_context.hash("tripwire123"),
+                    department="Information Technology"
+                )
+                db.add(m2)
+                db.commit()
+
+            # Ensure a student exists belonging to FAC002
+            s_other = db.query(Student).filter(Student.student_id == "TEST_FAC2_001").first()
+            if not s_other:
+                s_other = Student(
+                    student_id="TEST_FAC2_001",
+                    name="Other Student",
+                    section="IT S1",
+                    roll_no="IT24099",
+                    mentor_id="FAC002",
+                    archetype="normal"
+                )
+                db.add(s_other)
+                db.commit()
+
+            # Ensure an alert exists belonging to FAC002's student
+            alt_other = db.query(TripwireAlert).filter(TripwireAlert.student_id == "TEST_FAC2_001").first()
+            if not alt_other:
+                from datetime import datetime
+                alt_other = TripwireAlert(
+                    student_id="TEST_FAC2_001",
+                    dvi_score=75.0,
+                    trigger_date=datetime.utcnow(),
+                    status="active"
+                )
+                db.add(alt_other)
+                db.commit()
+                db.refresh(alt_other)
+
+            cls.other_student_id = "TEST_FAC2_001"
+            cls.other_alert_id = alt_other.alert_id
+        finally:
+            db.close()
+
+        # FAC001 token
+        token1 = create_access_token({"sub": "FAC001", "role": "faculty"})
+        cls.fac1_headers = {"Authorization": f"Bearer {token1}"}
+
+    def test_cross_mentor_student_profile_404(self):
+        res = self.client.get(f"/students/{self.other_student_id}", headers=self.fac1_headers)
+        self.assertEqual(res.status_code, 404)
+
+    def test_cross_mentor_student_timeline_404(self):
+        res = self.client.get(f"/students/{self.other_student_id}/timeline", headers=self.fac1_headers)
+        self.assertEqual(res.status_code, 404)
+
+    def test_cross_mentor_student_dvi_history_404(self):
+        res = self.client.get(f"/students/{self.other_student_id}/dvi-history", headers=self.fac1_headers)
+        self.assertEqual(res.status_code, 404)
+
+    def test_cross_mentor_alert_detail_404(self):
+        res = self.client.get(f"/alerts/{self.other_alert_id}", headers=self.fac1_headers)
+        self.assertEqual(res.status_code, 404)
+
+    def test_cross_mentor_alert_feedback_404(self):
+        res = self.client.get(f"/alerts/{self.other_alert_id}/feedback", headers=self.fac1_headers)
+        self.assertEqual(res.status_code, 404)
+
+    def test_cross_mentor_alert_excuse_404(self):
+        res = self.client.post(f"/alerts/{self.other_alert_id}/excuse", headers=self.fac1_headers)
+        self.assertEqual(res.status_code, 404)
+
+    def test_cross_mentor_interventions_by_student_404(self):
+        res = self.client.get(f"/interventions/student/{self.other_student_id}", headers=self.fac1_headers)
+        self.assertEqual(res.status_code, 404)
 
 
 def run_all_tests():
@@ -422,6 +621,7 @@ def run_all_tests():
     suite.addTests(loader.loadTestsFromTestCase(TestDatabaseIntegrity))
     suite.addTests(loader.loadTestsFromTestCase(TestAuthAndSecurity))
     suite.addTests(loader.loadTestsFromTestCase(TestAPIEndpoints))
+    suite.addTests(loader.loadTestsFromTestCase(TestAccessControlIDOR))
 
     runner = unittest.TextTestRunner(verbosity=2)
     result = runner.run(suite)

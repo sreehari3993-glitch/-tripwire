@@ -2,16 +2,18 @@ import React, { useState, useEffect, useRef } from 'react'
 import {
   Play, Pause, RotateCcw, ChevronRight, ChevronLeft, X,
   Sparkles, AlertTriangle, CheckCircle, Clock, Activity, MessageSquare,
-  Shield, TrendingDown, TrendingUp, HelpCircle, ArrowRight
+  Shield, TrendingDown, TrendingUp, HelpCircle, ArrowRight, Zap
 } from 'lucide-react'
 import { StatusBadge, VelocityLabel } from './Shared'
-import { BASE_URL } from '../api/client'
+import { BASE_URL, studentsAPI } from '../api/client'
+import toast from 'react-hot-toast'
 
 export default function DemoModal({ isOpen, onClose }) {
   const [stages, setStages] = useState([])
   const [currentIdx, setCurrentIdx] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
   const [speed, setSpeed] = useState(1) // 1x, 1.5x, 2x
+  const [isLiveSimulating, setIsLiveSimulating] = useState(false)
   const timerRef = useRef(null)
 
   useEffect(() => {
@@ -70,6 +72,32 @@ export default function DemoModal({ isOpen, onClose }) {
     setIsPlaying(true)
   }
 
+  const handleTriggerLiveDrift = async () => {
+    try {
+      setIsLiveSimulating(true)
+      const res = await studentsAPI.simulateDrift('CSE24001')
+      toast.error(`Live Event Triggered: ${res.data.summary}`)
+      setCurrentIdx(2) // Jump to Stage 3 (Tripwire Triggered)
+    } catch (e) {
+      toast.error('Failed to trigger live event.')
+    } finally {
+      setIsLiveSimulating(false)
+    }
+  }
+
+  const handleTriggerLiveRecovery = async () => {
+    try {
+      setIsLiveSimulating(true)
+      const res = await studentsAPI.simulateRecovery('CSE24001')
+      toast.success(`Live Recovery Triggered: ${res.data.summary}`)
+      setCurrentIdx(4) // Jump to Stage 5 (Recovery)
+    } catch (e) {
+      toast.error('Failed to trigger recovery.')
+    } finally {
+      setIsLiveSimulating(false)
+    }
+  }
+
   return (
     <div style={{
       position: 'fixed',
@@ -112,7 +140,7 @@ export default function DemoModal({ isOpen, onClose }) {
               <Sparkles size={16} color="#fff" />
             </div>
             <div>
-              <div style={{ fontWeight: 800, fontSize: 15, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontWeight: 800, fontSize: 15, color: '#f8fafc', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 TRIPWIRE DEMO EXPERIENCE
                 <span style={{ fontSize: 10, color: 'var(--brand-glow)', background: 'rgba(99,102,241,0.15)', padding: '2px 8px', borderRadius: 4 }}>
                   STUDENT STORY: RAHUL MENON (S5 CSE)
@@ -132,6 +160,50 @@ export default function DemoModal({ isOpen, onClose }) {
               style={{ borderRadius: 8, padding: '6px 10px' }}
             >
               <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Scripted Walkthrough Notice Banner with Live DB trigger actions */}
+        <div style={{
+          background: 'rgba(245, 158, 11, 0.08)',
+          borderBottom: '1px solid rgba(245, 158, 11, 0.2)',
+          padding: '8px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+          fontSize: 11,
+          color: '#fbbf24',
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+            <span>
+              <strong>Pedagogical Trajectory:</strong> Demonstrates the 6-stage early warning and recovery cycle.
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              id="demo-live-drift-btn"
+              className="btn btn-ghost btn-sm"
+              onClick={handleTriggerLiveDrift}
+              disabled={isLiveSimulating}
+              style={{ padding: '3px 10px', fontSize: 11, color: '#ef4444', border: '1px solid rgba(239,68,68,0.35)' }}
+              title="Executes live database telemetry insertion and computes real-time DVI spike"
+            >
+              <Zap size={12} /> {isLiveSimulating ? 'In Progress...' : '⚡ Trigger Live DB Crisis'}
+            </button>
+            <button
+              id="demo-live-recovery-btn"
+              className="btn btn-ghost btn-sm"
+              onClick={handleTriggerLiveRecovery}
+              disabled={isLiveSimulating}
+              style={{ padding: '3px 10px', fontSize: 11, color: '#10b981', border: '1px solid rgba(16,185,129,0.35)' }}
+              title="Executes live database intervention record and restores DVI recovery status"
+            >
+              <Zap size={12} /> {isLiveSimulating ? 'In Progress...' : '⚡ Trigger Live Recovery'}
             </button>
           </div>
         </div>

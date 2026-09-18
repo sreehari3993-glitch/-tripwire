@@ -2,8 +2,13 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { studentsAPI } from '../api/client'
 import { StatusBadge, DVIBar, VelocityLabel, LoadingScreen, PrototypeThresholdBadge } from '../components/Shared'
-import { Search, ChevronRight, Users, Sparkles, Filter } from 'lucide-react'
+import { Search, ChevronRight, Users, Sparkles, Filter, UserPlus, Upload, CheckSquare, RotateCcw, Trash2, Activity } from 'lucide-react'
 import { useModals } from '../context/ModalContext'
+import AddStudentModal from '../components/AddStudentModal'
+import ImportCSVModal from '../components/ImportCSVModal'
+import LogTelemetryModal from '../components/LogTelemetryModal'
+import BatchAttendanceModal from '../components/BatchAttendanceModal'
+import toast from 'react-hot-toast'
 
 const STATUS_OPTIONS = [
   { value: 'all',        label: 'All Students' },
@@ -21,10 +26,17 @@ export default function StudentList() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
 
+  // Modals state
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
+  const [isBatchOpen, setIsBatchOpen] = useState(false)
+  const [selectedStudentForTelemetry, setSelectedStudentForTelemetry] = useState(null)
+
   const fetchStudents = () => {
     setLoading(true)
     studentsAPI.list({ status: statusFilter, search })
-      .then(res => setStudents(res.data.students))
+      .then(res => setStudents(res.data.students || []))
+      .catch(() => toast.error('Failed to load students'))
       .finally(() => setLoading(false))
   }
 
@@ -35,17 +47,86 @@ export default function StudentList() {
     fetchStudents()
   }
 
+  const handleDeleteStudent = async (e, studentId, studentName) => {
+    e.stopPropagation()
+    if (!window.confirm(`Are you sure you want to delete student '${studentName}'? All associated attendance and alerts will also be deleted.`)) {
+      return
+    }
+    try {
+      await studentsAPI.delete(studentId)
+      toast.success(`Student '${studentName}' deleted.`)
+      fetchStudents()
+    } catch (err) {
+      toast.error('Failed to delete student')
+    }
+  }
+
+  const handleResetCohort = async (mode) => {
+    const msg = mode === 'seed'
+      ? 'Reload the 50-student synthetic demo cohort? This will replace your current roster.'
+      : 'Clear all students from your roster to start completely blank?'
+    if (!window.confirm(msg)) return
+
+    try {
+      await studentsAPI.resetCohort(mode)
+      toast.success(mode === 'seed' ? 'Demo cohort loaded.' : 'Cohort cleared.')
+      fetchStudents()
+    } catch (err) {
+      toast.error('Failed to reset cohort')
+    }
+  }
+
   return (
     <div>
       <div className="page-header">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 14 }}>
           <div>
             <h1 className="page-title">Students Directory</h1>
             <p className="page-subtitle">
               Continuous behavioral drift monitoring across your mentorship group
             </p>
           </div>
-          <PrototypeThresholdBadge />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              id="add-student-btn"
+              className="btn btn-primary btn-sm"
+              onClick={() => setIsAddOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <UserPlus size={14} /> Add Student
+            </button>
+
+            <button
+              id="import-csv-btn"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setIsImportOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <Upload size={14} /> Import CSV
+            </button>
+
+            <button
+              id="batch-attendance-btn"
+              className="btn btn-ghost btn-sm"
+              onClick={() => setIsBatchOpen(true)}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+            >
+              <CheckSquare size={14} /> Batch Attendance
+            </button>
+
+            <button
+              id="reset-cohort-btn"
+              className="btn btn-ghost btn-sm"
+              onClick={() => handleResetCohort(students.length === 0 ? 'seed' : 'empty')}
+              title={students.length === 0 ? 'Load Demo Cohort' : 'Clear Roster'}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, color: 'var(--text-muted)' }}
+            >
+              <RotateCcw size={13} /> {students.length === 0 ? 'Load Demo Data' : 'Clear Roster'}
+            </button>
+
+            <PrototypeThresholdBadge />
+          </div>
         </div>
       </div>
 
@@ -119,6 +200,7 @@ export default function StudentList() {
                   <th>Trend</th>
                   <th>Status</th>
                   <th>Last Activity</th>
+                  <th style={{ textAlign: 'center' }}>Quick Actions</th>
                   <th></th>
                 </tr>
               </thead>
@@ -156,6 +238,29 @@ export default function StudentList() {
                     <td style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
                       {student.last_activity}
                     </td>
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedStudentForTelemetry(student)
+                          }}
+                          title="Log Attendance / Delays"
+                          style={{ padding: '4px 8px', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        >
+                          <Activity size={13} color="var(--brand-glow)" /> Log
+                        </button>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={(e) => handleDeleteStudent(e, student.student_id, student.name)}
+                          title="Delete Student"
+                          style={{ padding: '4px 8px', color: '#ef4444' }}
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
                     <td>
                       <ChevronRight size={16} color="var(--text-muted)" />
                     </td>
@@ -166,6 +271,33 @@ export default function StudentList() {
           </div>
         )}
       </div>
+
+      {/* Dynamic Data Modals */}
+      <AddStudentModal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        onStudentAdded={() => fetchStudents()}
+      />
+
+      <ImportCSVModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImportSuccess={() => fetchStudents()}
+      />
+
+      <BatchAttendanceModal
+        isOpen={isBatchOpen}
+        onClose={() => setIsBatchOpen(false)}
+        students={students}
+        onAttendanceSubmitted={() => fetchStudents()}
+      />
+
+      <LogTelemetryModal
+        isOpen={!!selectedStudentForTelemetry}
+        onClose={() => setSelectedStudentForTelemetry(null)}
+        student={selectedStudentForTelemetry}
+        onTelemetryLogged={() => fetchStudents()}
+      />
     </div>
   )
 }

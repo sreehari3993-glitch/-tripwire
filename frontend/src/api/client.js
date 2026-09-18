@@ -1,6 +1,11 @@
 import axios from 'axios'
 
-export const BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
+export const BASE_URL = (
+  import.meta.env.VITE_API_URL ||
+  (typeof window !== 'undefined' && window.location.hostname
+    ? `http://${window.location.hostname}:8000`
+    : 'http://localhost:8000')
+).replace(/\/+$/, '')
 
 const api = axios.create({ baseURL: BASE_URL })
 
@@ -37,22 +42,38 @@ export const authAPI = {
 }
 
 export const dashboardAPI = {
-  summary: () => api.get('/dashboard/summary')
+  summary: () => api.get('/dashboard/summary'),
+  cohortHeatmap: () => api.get('/dashboard/cohort-heatmap')
 }
 
 export const studentsAPI = {
   list: (params = {}) => api.get('/students', { params }),
   profile: (id) => api.get(`/students/${id}`),
+  create: (data) => api.post('/students', data),
+  delete: (id) => api.delete(`/students/${id}`),
+  importCSV: (csv_text) => api.post('/students/import-csv', { csv_text }),
+  getTemplateUrl: () => `${BASE_URL}/students/template-csv`,
+  logAttendance: (id, data) => api.post(`/students/${id}/attendance`, data),
+  logAssignment: (id, data) => api.post(`/students/${id}/assignments`, data),
+  logLMS: (id, data) => api.post(`/students/${id}/lms`, data),
+  batchAttendance: (data) => api.post('/students/batch-attendance', data),
+  resetCohort: (mode = 'empty') => api.post('/students/reset-cohort', { mode }),
   dviHistory: (id, days = 28) => api.get(`/students/${id}/dvi-history`, { params: { days } }),
   timeline: (id) => api.get(`/students/${id}/timeline`),
   excuse: (id, data) => api.post(`/students/${id}/excuse`, data),
   submitPulse: (id, data) => api.post(`/students/${id}/pulse`, data),
-  getPulses: (id) => api.get(`/students/${id}/pulse`)
+  getPulses: (id) => api.get(`/students/${id}/pulse`),
+  simulateDrift: (id) => api.post(`/students/${id}/simulate-drift`),
+  simulateRecovery: (id) => api.post(`/students/${id}/simulate-recovery`),
+  simulateReset: (id) => api.post(`/students/${id}/simulate-reset`)
 }
 
 export const alertsAPI = {
   list: () => api.get('/alerts'),
   get: (id) => api.get(`/alerts/${id}`),
+  unreadCount: () => api.get('/alerts/unread-count'),
+  markAllRead: () => api.post('/alerts/mark-all-read'),
+  markRead: (id) => api.post(`/alerts/${id}/mark-read`),
   aiExplain: (id) => api.post(`/alerts/${id}/ai-explain`),
   excuse: (id) => api.post(`/alerts/${id}/excuse`),
   submitFeedback: (id, data) => api.post(`/alerts/${id}/feedback`, data),

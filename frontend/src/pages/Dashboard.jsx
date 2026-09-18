@@ -11,8 +11,10 @@ import { useModals } from '../context/ModalContext'
 import {
   Users, AlertTriangle, CheckCircle, Activity, ChevronRight,
   TrendingDown, Sparkles, Layers, ShieldCheck, Clock, BookOpen,
-  Award, TrendingUp
+  Award, TrendingUp, HelpCircle, MessageSquare, UserPlus, Upload
 } from 'lucide-react'
+import AddStudentModal from '../components/AddStudentModal'
+import ImportCSVModal from '../components/ImportCSVModal'
 
 export default function Dashboard() {
   const { mentor } = useAuth()
@@ -22,17 +24,23 @@ export default function Dashboard() {
   const [students, setStudents] = useState([])
   const [trustData, setTrustData] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
 
-  useEffect(() => {
-    Promise.all([
+  const fetchDashboardData = () => {
+    return Promise.all([
       dashboardAPI.summary(),
       studentsAPI.list(),
       analyticsAPI.trustScore()
     ]).then(([sumRes, stuRes, trustRes]) => {
       setSummary(sumRes.data)
-      setStudents(stuRes.data.students)
+      setStudents(stuRes.data.students || [])
       setTrustData(trustRes.data)
     }).finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    fetchDashboardData()
   }, [])
 
   if (loading) return <LoadingScreen text="Loading Tripwire analytics dashboard..." />
@@ -379,214 +387,286 @@ export default function Dashboard() {
               </p>
             </div>
 
-            <div style={{
-              background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)',
-              borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10
-            }}>
-              <TrendingUp size={18} color="var(--color-normal)" />
-              <div>
-                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Semester Trust Trend</div>
-                <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-normal)' }}>
-                  +{trustData?.recovery_diff || 18}% Since Week 3 Trough
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Top Metric Cards Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
-            {/* Metric 1: Trust Score */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '14px 16px'
-            }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
-                Current System Trust Score
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-mono)', color: 'var(--brand-glow)' }}>
-                  {trustData?.overall_trust_score || 82.4}
-                </span>
-                <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>/ 100</span>
-                <span style={{ fontSize: 12, color: 'var(--color-normal)', fontWeight: 700, marginLeft: 'auto' }}>
-                  ↑ Post-Tuning
-                </span>
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
-                Composite: 50% flag accuracy + 50% usefulness
-              </div>
-            </div>
-
-            {/* Metric 2: False Positive Rate */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '14px 16px'
-            }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
-                False Positive Rate
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-mono)', color: '#f59e0b' }}>
-                  {trustData?.false_positive_rate || 10.7}%
-                </span>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
-                  {trustData?.total_feedback_count || 28} flags reviewed
-                </span>
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.3 }}>
-                Mostly excused leaves prior to override approval
-              </div>
-            </div>
-
-            {/* Metric 3: Accuracy Rate */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '14px 16px'
-            }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
-                Flag Accuracy Consensus
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-mono)', color: 'var(--color-normal)' }}>
-                  {trustData?.accurate_rate || 78.6}%
-                </span>
-                <span style={{ fontSize: 11, color: 'var(--color-normal)', fontWeight: 700, marginLeft: 'auto' }}>
-                  High Precision
-                </span>
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
-                Verified as genuine disengagement by faculty
-              </div>
-            </div>
-
-            {/* Metric 4: Mean Usefulness */}
-            <div style={{
-              background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '14px 16px'
-            }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
-                Mentor Actionability Rating
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-mono)', color: '#fbbf24' }}>
-                  {trustData?.avg_useful || 4.2}
-                </span>
-                <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>/ 5.0 ⭐</span>
-              </div>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
-                Average Likert score across faculty feedback
-              </div>
-            </div>
-          </div>
-
-          {/* Chart + DVI Breakdown Split */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginBottom: 16 }}>
-            {/* The Disconfirmation Curve Line Chart */}
-            <div style={{ background: 'rgba(0, 0, 0, 0.25)', borderRadius: 10, padding: 14, border: '1px solid var(--border-subtle)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            {trustData?.recovery_diff != null ? (
+              <div style={{
+                background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)',
+                borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10
+              }}>
+                <TrendingUp size={18} color="var(--color-normal)" />
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
-                    Semester Trust Trajectory (The Disconfirmation Curve)
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    Initial usage expectation mismatch → dip at W3 → recovery after threshold tuning
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Semester Trust Trend</div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--color-normal)' }}>
+                    +{trustData.recovery_diff}% Since Earliest Week
                   </div>
                 </div>
-                <span style={{ fontSize: 10, color: '#818cf8', fontWeight: 700, background: 'rgba(99, 102, 241, 0.1)', padding: '2px 8px', borderRadius: 4 }}>
-                  N = {trustData?.total_feedback_count || 28} reviews
-                </span>
               </div>
-
-              <div style={{ height: 180 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={trustData?.trust_score_trend || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="trustGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-                    <XAxis dataKey="week" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} />
-                    <YAxis domain={[30, 100]} tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} />
-                    <Tooltip
-                      contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }}
-                      formatter={(val, name, item) => [`${val}% (Phase: ${item.payload.phase})`, 'Trust Score']}
-                    />
-                    <Area type="monotone" dataKey="trust_score" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#trustGrad)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+            ) : (
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)',
+                borderRadius: 10, padding: '8px 14px', display: 'flex', alignItems: 'center', gap: 10
+              }}>
+                <HelpCircle size={18} color="var(--text-muted)" />
+                <div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700 }}>Telemetry Status</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>
+                    Awaiting Faculty Feedback
+                  </div>
+                </div>
               </div>
+            )}
+          </div>
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)', marginTop: 8, borderTop: '1px solid var(--border-subtle)', paddingTop: 6 }}>
-                <span>W1: Initial Deployment (70%)</span>
-                <span style={{ color: '#f87171', fontWeight: 700 }}>W3: Disconfirmation Dip (42%)</span>
-                <span style={{ color: '#34d399', fontWeight: 700 }}>W6: Calibrated Maturity (98%)</span>
+          {/* Empty State vs Live Trust Telemetry */}
+          {(!trustData?.overall_trust_score || trustData?.status === 'no_feedback_yet' || trustData?.total_feedback_count === 0) ? (
+            <div style={{
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px dashed var(--border-subtle)',
+              borderRadius: 12,
+              padding: '48px 24px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12
+            }}>
+              <div style={{
+                width: 52,
+                height: 52,
+                borderRadius: '50%',
+                background: 'rgba(99, 102, 241, 0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <MessageSquare size={24} color="var(--brand-glow)" />
+              </div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: '#f8fafc' }}>
+                Not Enough Feedback Yet
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 540, lineHeight: 1.6 }}>
+                Faculty feedback tracking is waiting for mentor verifications. Once faculty members review alerts and submit verification feedback (accurate, false positive, too late, or unclear), empirical trust tracking and longitudinal curves will automatically render here.
+              </div>
+              <div style={{
+                marginTop: 6,
+                fontSize: 11,
+                color: 'var(--text-muted)',
+                background: 'rgba(255, 255, 255, 0.04)',
+                padding: '6px 14px',
+                borderRadius: 20,
+                border: '1px solid var(--border-subtle)'
+              }}>
+                Grounding: Expectation-Disconfirmation Model in EWS (Bhattacherjee &amp; Premkumar, 2004)
               </div>
             </div>
-
-            {/* Breakdown by DVI Severity Range */}
-            <div style={{ background: 'rgba(0, 0, 0, 0.25)', borderRadius: 10, padding: 14, border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
-                  Trust by DVI Severity Range
+          ) : (
+            <>
+              {/* Top Metric Cards Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
+                {/* Metric 1: Trust Score */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '14px 16px'
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
+                    Current System Trust Score
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-mono)', color: 'var(--brand-glow)' }}>
+                      {trustData.overall_trust_score}
+                    </span>
+                    <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>/ 100</span>
+                    <span style={{ fontSize: 12, color: 'var(--color-normal)', fontWeight: 700, marginLeft: 'auto' }}>
+                      Empirical
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Composite: 50% flag accuracy + 50% usefulness
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
-                  Verifies that higher-confidence flags generate higher faculty trust
+
+                {/* Metric 2: False Positive Rate */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '14px 16px'
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
+                    False Positive Rate
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-mono)', color: '#f59e0b' }}>
+                      {trustData.false_positive_rate}%
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 'auto' }}>
+                      {trustData.total_feedback_count} flag(s) reviewed
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.3 }}>
+                    Empirical faculty disconfirmation rate
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {(trustData?.breakdown_by_dvi_range || []).map((row, idx) => (
-                    <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
-                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{row.range}</span>
-                        <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: row.trust_score >= 85 ? 'var(--color-normal)' : 'var(--color-monitor)' }}>
-                          {row.trust_score}% Trust
-                        </span>
+                {/* Metric 3: Accuracy Rate */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '14px 16px'
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
+                    Flag Accuracy Consensus
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-mono)', color: 'var(--color-normal)' }}>
+                      {trustData.accurate_rate}%
+                    </span>
+                    <span style={{ fontSize: 11, color: 'var(--color-normal)', fontWeight: 700, marginLeft: 'auto' }}>
+                      Verified
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Verified as genuine disengagement by faculty
+                  </div>
+                </div>
+
+                {/* Metric 4: Mean Usefulness */}
+                <div style={{
+                  background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)', borderRadius: 10, padding: '14px 16px'
+                }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>
+                    Mentor Actionability Rating
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-mono)', color: '#fbbf24' }}>
+                      {trustData.avg_useful}
+                    </span>
+                    <span style={{ fontSize: 14, color: 'var(--text-muted)' }}>/ 5.0 ⭐</span>
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>
+                    Average Likert score across faculty feedback
+                  </div>
+                </div>
+              </div>
+
+              {/* Chart + DVI Breakdown Split */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 16, marginBottom: 16 }}>
+                {/* The Disconfirmation Curve Line Chart */}
+                <div style={{ background: 'rgba(0, 0, 0, 0.25)', borderRadius: 10, padding: 14, border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
+                        Semester Trust Trajectory (The Disconfirmation Curve)
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)' }}>
-                        <span>{row.count} alerts · {row.accurate_pct}% accurate</span>
-                        <span>{row.false_positive_rate}% false positive</span>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                        Observed weekly faculty trust progression over time
                       </div>
                     </div>
-                  ))}
+                    <span style={{ fontSize: 10, color: '#818cf8', fontWeight: 700, background: 'rgba(99, 102, 241, 0.1)', padding: '2px 8px', borderRadius: 4 }}>
+                      N = {trustData.total_feedback_count} reviews
+                    </span>
+                  </div>
+
+                  <div style={{ height: 180 }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={trustData.trust_score_trend || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="trustGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
+                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                        <XAxis dataKey="week" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} />
+                        <YAxis domain={[30, 100]} tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} />
+                        <Tooltip
+                          contentStyle={{ background: '#1e293b', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, fontSize: 12 }}
+                          formatter={(val, name, item) => [`${val}% (Phase: ${item.payload.phase})`, 'Trust Score']}
+                        />
+                        <Area type="monotone" dataKey="trust_score" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#trustGrad)" />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* Breakdown by DVI Severity Range */}
+                <div style={{ background: 'rgba(0, 0, 0, 0.25)', borderRadius: 10, padding: 14, border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', marginBottom: 4 }}>
+                      Trust by DVI Severity Range
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 12 }}>
+                      Verifies that higher-confidence flags generate higher faculty trust
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {(trustData.breakdown_by_dvi_range || []).map((row, idx) => (
+                        <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '8px 10px', borderRadius: 8, border: '1px solid var(--border-subtle)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+                            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{row.range}</span>
+                            <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 800, color: (row.trust_score || 0) >= 85 ? 'var(--color-normal)' : 'var(--color-monitor)' }}>
+                              {row.trust_score != null ? `${row.trust_score}% Trust` : 'No reviews'}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--text-muted)' }}>
+                            <span>{row.count} alerts · {row.accurate_pct != null ? `${row.accurate_pct}% accurate` : 'N/A'}</span>
+                            <span>{row.false_positive_rate != null ? `${row.false_positive_rate}% FP` : 'N/A'}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div style={{ marginTop: 10, fontSize: 10, color: 'var(--text-muted)', fontStyle: 'italic', borderTop: '1px solid var(--border-subtle)', paddingTop: 6 }}>
-                💡 Critical finding: DVI 80+ alerts show 100% precision, while 70-79 alerts capture early emergent drift.
-              </div>
-            </div>
-          </div>
-
-          {/* Auto-Generated Narrative Card */}
-          <div style={{
-            background: 'rgba(99, 102, 241, 0.1)',
-            border: '1px solid rgba(99, 102, 241, 0.3)',
-            borderRadius: 8,
-            padding: '10px 14px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10
-          }}>
-            <Sparkles size={16} color="var(--brand-glow)" style={{ flexShrink: 0 }} />
-            <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
-              <strong>Self-Monitoring Narrative:</strong> {trustData?.narrative}
-            </div>
-          </div>
+              {/* Auto-Generated Narrative Card */}
+              {trustData.narrative && (
+                <div style={{
+                  background: 'rgba(99, 102, 241, 0.1)',
+                  border: '1px solid rgba(99, 102, 241, 0.3)',
+                  borderRadius: 8,
+                  padding: '10px 14px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10
+                }}>
+                  <Sparkles size={16} color="var(--brand-glow)" style={{ flexShrink: 0 }} />
+                  <div style={{ fontSize: 12, color: 'var(--text-primary)', lineHeight: 1.5 }}>
+                    <strong>Self-Monitoring Narrative:</strong> {trustData.narrative}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Class Engagement Overview Table */}
         <div className="card">
-          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span>Class Engagement Overview</span>
               <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 400 }}>
                 ({students.length} students enrolled)
               </span>
             </div>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => navigate('/students')}
-            >
-              View Full Student Table &rarr;
-            </button>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                id="dash-add-student-btn"
+                className="btn btn-primary btn-sm"
+                onClick={() => setIsAddOpen(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+              >
+                <UserPlus size={13} /> Add Student
+              </button>
+              <button
+                id="dash-import-csv-btn"
+                className="btn btn-ghost btn-sm"
+                onClick={() => setIsImportOpen(true)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11 }}
+              >
+                <Upload size={13} /> Import CSV
+              </button>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => navigate('/students')}
+              >
+                View Full Table &rarr;
+              </button>
+            </div>
           </div>
 
           <table className="data-table">
@@ -631,6 +711,19 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
+
+      {/* Dynamic Data Modals */}
+      <AddStudentModal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        onStudentAdded={() => fetchDashboardData()}
+      />
+
+      <ImportCSVModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImportSuccess={() => fetchDashboardData()}
+      />
     </div>
   )
 }

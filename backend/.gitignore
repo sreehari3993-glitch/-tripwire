@@ -1,0 +1,32 @@
+# Environment & Secret files
+.env
+*.env
+*.pem
+*.key
+
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Distribution / Packaging
+build/
+dist/
+*.egg-info/
+
+# Dynamically generated validation artifacts
+scripts/weight_validation_results.json
+scripts/model_validation_results.json
+scripts/weight_validation_report.md

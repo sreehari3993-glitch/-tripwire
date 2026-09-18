@@ -17,7 +17,15 @@ def get_summary(db: Session = Depends(get_db), mentor=Depends(get_current_mentor
     monitoring_count = 0
     tripwire_count   = 0
     recovering_count = 0
-    resolved_count   = db.query(Intervention).count()
+    student_ids = [s.student_id for s in students]
+
+    resolved_count = (
+        db.query(Intervention)
+        .join(TripwireAlert, Intervention.alert_id == TripwireAlert.alert_id)
+        .filter(TripwireAlert.student_id.in_(student_ids))
+        .count()
+        if student_ids else 0
+    )
 
     distribution = {
         "0_20": 0,
@@ -61,10 +69,18 @@ def get_summary(db: Session = Depends(get_db), mentor=Depends(get_current_mentor
             "status": s
         })
 
-    # Recent alerts
-    recent_alerts = db.query(TripwireAlert).filter(
-        TripwireAlert.status == "active"
-    ).order_by(TripwireAlert.trigger_date.desc()).limit(5).all()
+    # Recent alerts scoped to mentor's students
+    recent_alerts = (
+        db.query(TripwireAlert)
+        .filter(
+            TripwireAlert.student_id.in_(student_ids),
+            TripwireAlert.status == "active"
+        )
+        .order_by(TripwireAlert.trigger_date.desc())
+        .limit(5)
+        .all()
+        if student_ids else []
+    )
 
     return {
         "total_students": len(students),

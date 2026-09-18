@@ -12,8 +12,8 @@ export default function PrivacyEthicsModal({ isOpen, onClose }) {
     },
     {
       icon: Lock,
-      title: "Confidential, Private Alerts",
-      desc: "Risk indicators and DVI scores are strictly confidential to authorized faculty mentors. Students are never shown anxiety-inducing labels such as 'HIGH RISK' or 'DISENGAGED', preventing stereotype threat and learned helplessness."
+      title: "Confidential, Private Alerts & RBAC",
+      desc: "Risk indicators and DVI scores are strictly confidential to authorized faculty mentors via tenant-isolated role-based access control (RBAC). Mentors can only query telemetry and alerts for their assigned students, preventing cross-faculty data leakage. Students are never shown anxiety-inducing labels such as 'HIGH RISK' or 'DISENGAGED', preventing stereotype threat."
     },
     {
       icon: HeartHandshake,
@@ -28,12 +28,12 @@ export default function PrivacyEthicsModal({ isOpen, onClose }) {
     {
       icon: Sliders,
       title: "Human Override & False-Positive Safeguards",
-      desc: "Faculty mentors can mark any data point or alert as 'EXCUSED' (e.g. for approved medical leave, sports events, family bereavement), instantly recalibrating or overriding the DVI calculation."
+      desc: "Faculty mentors can mark any data point or alert as 'EXCUSED' (e.g. for approved medical leave, sports events, family bereavement), instantly recalibrating the DVI calculation."
     },
     {
       icon: Database,
       title: "DPDP Act 2023 Compliance & Data Minimization",
-      desc: "Designed in strict alignment with India's Digital Personal Data Protection Act 2023. Adheres to strict purpose limitation, data minimization, role-based access control (RBAC), and uses 100% synthetic data for prototype demonstrations."
+      desc: "Designed in strict alignment with India's Digital Personal Data Protection Act 2023. Adheres to strict purpose limitation, data minimization, cryptographically verified role-based access control (RBAC with no hardcoded bypasses), and uses 100% synthetic data for demonstrations."
     }
   ]
 

@@ -78,6 +78,7 @@ def run_weight_validation() -> Dict:
             all_scores = []
 
             tp, fp, fn, tn = 0, 0, 0, 0
+            fp_normal, fp_excused = 0, 0
 
             for s in students:
                 archetype = getattr(s, "archetype", "normal") or "normal"
@@ -86,7 +87,7 @@ def run_weight_validation() -> Dict:
                 dvi = res["dvi"]
                 all_scores.append({"id": s.student_id, "name": s.name, "archetype": archetype, "dvi": dvi})
 
-                if archetype == "rapid_decline" or s.name == "Rahul":
+                if archetype == "rapid_decline":
                     rapid_scores.append(dvi)
                     if dvi >= THRESHOLD_ALERT:
                         tp += 1
@@ -95,13 +96,18 @@ def run_weight_validation() -> Dict:
                 elif archetype in ["normal", "excused"]:
                     if archetype == "normal":
                         normal_scores.append(dvi)
+                        if dvi >= THRESHOLD_ALERT:
+                            fp_normal += 1
+                            fp += 1
+                        else:
+                            tn += 1
                     else:
                         excused_scores.append(dvi)
-
-                    if dvi >= THRESHOLD_ALERT:
-                        fp += 1
-                    else:
-                        tn += 1
+                        if dvi >= THRESHOLD_ALERT:
+                            fp_excused += 1
+                            fp += 1
+                        else:
+                            tn += 1
 
             negative_scores = normal_scores + excused_scores
 
@@ -129,6 +135,8 @@ def run_weight_validation() -> Dict:
                 "separation_gap": round(separation_gap, 1),
                 "tp": tp,
                 "fp": fp,
+                "fp_normal": fp_normal,
+                "fp_excused": fp_excused,
                 "fn": fn,
                 "tn": tn,
                 "precision": round(precision * 100, 1),
@@ -140,6 +148,12 @@ def run_weight_validation() -> Dict:
         results.sort(key=lambda x: (x["f1_score"], x["separation_gap"]), reverse=True)
         best_candidate = results[0]
 
+        excused_fp_text = (
+            "zero false positives on excused leaves"
+            if best_candidate["fp_excused"] == 0
+            else f"{best_candidate['fp_excused']} false positive(s) on excused leaves (mean DVI {best_candidate['mean_excused']})"
+        )
+
         summary_payload = {
             "title": "DVI Weight Sensitivity & Separation Analysis",
             "threshold_used": THRESHOLD_ALERT,
@@ -150,7 +164,7 @@ def run_weight_validation() -> Dict:
                 f"The '{best_candidate['name']}' ({best_candidate['weights']['attendance']*100:.0f}% Att, "
                 f"{best_candidate['weights']['submission']*100:.0f}% Sub, {best_candidate['weights']['engagement']*100:.0f}% LMS) "
                 f"achieves the optimal separation gap ({best_candidate['separation_gap']} pts) with "
-                f"{best_candidate['f1_score']}% F1 score and zero false positives on excused leaves."
+                f"{best_candidate['f1_score']}% F1 score and {excused_fp_text}."
             )
         }
 
@@ -176,39 +190,63 @@ def run_weight_validation() -> Dict:
 
 
 def generate_markdown_report(filepath: str, data: Dict):
+    best_id = data["best_candidate"]
+    candidates = data["candidates"]
+    best = next(c for c in candidates if c["id"] == best_id)
+    other_candidates = [c for c in candidates if c["id"] != best_id]
+
     lines = [
         "# TRIPWIRE — DVI Weight Validation & Sensitivity Report",
         "",
-        "> **Objective**: Mathematically validate the 0.40/0.35/0.25 DVI weighting scheme against alternative configurations to prove optimal separation between disengaged students and healthy cohorts.",
+        "> **Objective**: Mathematically validate the DVI weighting scheme against alternative configurations to identify optimal separation between disengaged students and healthy cohorts.",
         "",
         f"**Evaluation Cohort**: {data['cohort_size']} students | **Alert Threshold**: DVI $\\ge {data['threshold_used']}$",
         "",
         "## 📊 Model Comparison & Separation Metrics",
         "",
-        "| Weight Configuration | Weights (Att / Sub / LMS) | Mean Rapid Decline | Mean Normal | Mean Excused | Separation Gap | Precision | Recall | F1 Score |",
-        "|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|"
+        "| Weight Configuration | Weights (Att / Sub / LMS) | Mean Rapid Decline | Mean Normal | Mean Excused | Separation Gap | Precision | Recall | F1 Score | Excused FP |",
+        "|:---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|"
     ]
 
-    for c in data["candidates"]:
+    for c in candidates:
         w = c["weights"]
         w_str = f"{int(w['attendance']*100)} / {int(w['submission']*100)} / {int(w['engagement']*100)}"
-        badge = " **(Selected)**" if c["id"] == data["best_candidate"] else ""
+        badge = " **(Top Ranked)**" if c["id"] == best_id else ""
         lines.append(
-            f"| **{c['name']}**{badge} | `{w_str}` | **{c['mean_rapid_decline']}** | {c['mean_normal']} | {c['mean_excused']} | **+{c['separation_gap']} pts** | {c['precision']}% | {c['recall']}% | **{c['f1_score']}%** |"
+            f"| **{c['name']}**{badge} | `{w_str}` | **{c['mean_rapid_decline']}** | {c['mean_normal']} | {c['mean_excused']} | **+{c['separation_gap']} pts** | {c['precision']}% | {c['recall']}% | **{c['f1_score']}%** | {c.get('fp_excused', c['fp'])} |"
         )
 
     lines.extend([
         "",
-        "## 🔍 Key Findings & Viva Defense",
+        "## 🔍 Key Findings & Empirical Analysis",
         "",
-        "1. **Why not 33/33/33 Equal Weights?**",
-        "   - Equal weights dilute the high-diagnostic signal of assignment latency drift (+18h late submission), reducing the separation gap between disengaged students and normal students.",
+        f"1. **Winning Configuration — {best['name']}**:",
+        f"   - Achieves top separation performance with an F1 score of **{best['f1_score']}%** and a separation gap of **+{best['separation_gap']} points** between rapid decline and healthy cohorts.",
+        f"   - Empirical design rationale: {best['rationale']}",
         "",
-        "2. **Why not Attendance-Heavy (50/30/20)?**",
-        "   - Pure attendance weighting fails to capture *silent* disengagement where students sit physically in lecture halls while completely disengaging from assignments and LMS materials.",
+        "2. **Comparison with Alternative Configurations**:"
+    ])
+
+    for oc in other_candidates:
+        gap_diff = round(best["separation_gap"] - oc["separation_gap"], 1)
+        f1_diff = round(best["f1_score"] - oc["f1_score"], 1)
+        lines.append(
+            f"   - **{oc['name']}**: Yielded a separation gap of +{oc['separation_gap']} pts "
+            f"({gap_diff:+.1f} pts vs top) and F1 score of {oc['f1_score']}% ({f1_diff:+.1f}% vs top). "
+            f"Config focus: {oc['rationale']}"
+        )
+
+    excused_fp = best.get("fp_excused", 0)
+    excused_claim = (
+        f"Under '{best['name']}', students on approved excused leaves maintain an average DVI of `{best['mean_excused']}`, safely generating zero false positives."
+        if excused_fp == 0 else
+        f"Under '{best['name']}', students on approved excused leaves have an average DVI of `{best['mean_excused']}`, with {excused_fp} student(s) crossing the threshold due to concurrent assignment/LMS drift."
+    )
+
+    lines.extend([
         "",
-        "3. **Protection for Excused Leaves**:",
-        f"   - Under the selected weights, students on approved medical leave achieve an average DVI of only `{data['candidates'][0]['mean_excused']}`, staying safely below the monitoring threshold (< 50) and generating zero false positives.",
+        "3. **Behavior on Excused Leaves Subgroup**:",
+        f"   - {excused_claim}",
         "",
         f"**Conclusion**: {data['recommendation']}"
     ])

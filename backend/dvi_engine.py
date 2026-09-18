@@ -306,7 +306,7 @@ def compute_dvi(
     else:
         # Default baseline prior is 0 for normal, or current raw if sustained archetype
         archetype = getattr(student, "archetype", "") or ""
-        if archetype in ["rapid_decline", "recovery"] or student.name == "Rahul":
+        if archetype in ["rapid_decline", "recovery"]:
             prior_att = raw_att
             prior_sub = raw_sub
             prior_eng = raw_eng
@@ -325,13 +325,11 @@ def compute_dvi(
     # Primary detection DVI uses smoothed score
     dvi = smoothed_dvi
 
-    # Check for recorded interventions
+    # Check for recorded interventions to determine pre- vs post-intervention hysteresis pathway
     latest_inv = db.query(Intervention).join(TripwireAlert).filter(
         TripwireAlert.student_id == student.student_id
     ).order_by(Intervention.contact_date.desc()).first()
 
-    if latest_inv and latest_inv.post_dvi is not None:
-        dvi = round(latest_inv.post_dvi, 1)
 
     # ──────────────────────────────────────────────────────────────────────────
     # HYSTERESIS RECOVERY ENGINE:

@@ -66,11 +66,19 @@ def _rule_based_explanation(student_name: str, factors: dict, dvi: float = 77.0)
         "Are there any specific topics in recent modules where a quick review or tutoring session would help relieve pressure?"
     ]
 
+    whatsapp_draft = (
+        f"Hey {first_name}! Hope your week is going well. Just wanted to do a quick informal check-in — "
+        f"noticed things have been pretty busy with classes and lab work lately. If you have a few minutes "
+        f"sometime this week, feel free to drop by my office or let me know if there's anything I can help with. "
+        f"No stress at all, just checking in!"
+    )
+
     return {
         "explanation": explanation,
         "talking_point": talking_point,
         "suggested_questions": suggested_questions,
         "behavioral_summary": behavioral_changes,
+        "whatsapp_draft": whatsapp_draft,
         "source": "rule_based",
         "ethics_note": "Decision-support guidance for authorized faculty mentors. Tripwire does not diagnose mental health or assess psychological traits."
     }
@@ -108,6 +116,7 @@ CRITICAL ETHICAL RULES:
 3. Focus ONLY on observable academic telemetry (attendance, submission timeliness, LMS activity).
 4. Frame all shifts relative to THIS STUDENT'S PERSONAL BASELINE (not a class average).
 5. Emphasize supportive, respectful, non-punitive mentorship.
+6. The "whatsapp_draft" MUST be a warm, casual, non-judgmental message under 45 words. It MUST NEVER mention AI, Tripwire, DVI, risk scores, or attendance percentages. It must sound like a caring teacher checking in casually about coursework and general well-being.
 
 Student Signals:
 - DVI Score: {dvi}/100 (Prototype Threshold: 70)
@@ -121,7 +130,8 @@ Respond ONLY with a valid JSON object containing exactly:
   "explanation": "A 2-3 sentence respectful summary of how the student's recent pattern deviates from their baseline, recommending a private check-in.",
   "talking_point": "A gentle, warm, conversational opener for the faculty mentor (under 50 words).",
   "suggested_questions": ["Question 1", "Question 2", "Question 3"],
-  "behavioral_summary": ["Bullet 1", "Bullet 2", "Bullet 3"]
+  "behavioral_summary": ["Bullet 1", "Bullet 2", "Bullet 3"],
+  "whatsapp_draft": "A warm, natural WhatsApp check-in message under 45 words without any mention of AI or risk."
 }}
 No markdown fences, no preamble."""
 
@@ -135,6 +145,14 @@ No markdown fences, no preamble."""
         text = text.strip()
 
         parsed = json.loads(text)
+        if "whatsapp_draft" not in parsed:
+            first_name = student_name.split()[0]
+            parsed["whatsapp_draft"] = (
+                f"Hey {first_name}! Hope your week is going well. Just wanted to do a quick informal check-in — "
+                f"noticed things have been pretty busy with classes and lab work lately. If you have a few minutes "
+                f"sometime this week, feel free to drop by my office or let me know if there's anything I can help with. "
+                f"No stress at all, just checking in!"
+            )
         parsed["source"] = "gemini"
         parsed["ethics_note"] = "Decision-support guidance for authorized faculty mentors. Tripwire does not diagnose mental health or assess psychological traits."
         return parsed

@@ -7,14 +7,25 @@ from passlib.context import CryptContext
 from datetime import datetime, timedelta
 import os
 import time
+from dotenv import load_dotenv
 
 from database import get_db, Mentor
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+load_dotenv()
 
-SECRET_KEY = os.getenv("SECRET_KEY", "tripwire-super-secret-key-hackathon-2026")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "CRITICAL SECURITY CONFIGURATION ERROR: 'SECRET_KEY' environment variable is not set. "
+        "Tripwire requires an explicit SECRET_KEY to sign JWT tokens. "
+        "Please define SECRET_KEY in your environment or .env file before starting the application."
+    )
+
+DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() in ("true", "1", "yes")
 ALGORITHM  = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 480   # 8 hours
+
+router = APIRouter(prefix="/auth", tags=["auth"])
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -98,8 +109,8 @@ def login(
         (Mentor.mentor_id == uname) | (Mentor.mentor_id == form_data.username.strip())
     ).first()
 
-    # If demo mentor doesn't exist yet on fresh DB, auto-provision with hashed password
-    if not mentor and uname in ["FAC001", "MTR001"] and form_data.password == "tripwire123":
+    # Auto-seed-on-first-login convenience strictly gated behind DEMO_MODE env var
+    if DEMO_MODE and not mentor and uname in ["FAC001", "MTR001"]:
         try:
             from database import Student
             if db.query(Student).count() == 0:

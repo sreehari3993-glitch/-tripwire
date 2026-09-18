@@ -166,6 +166,7 @@ DEMO_STAGES = [
 def get_demo_stages():
     """Return all 6 sequential stages of Rahul's demo arc."""
     return {
+        "data_source": "scripted_demo",
         "student_id": "CSE24001",
         "student_name": "Rahul Menon",
         "section": "CSE S2",

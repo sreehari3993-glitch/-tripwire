@@ -5,6 +5,7 @@ import json
 
 from database import get_db, TripwireAlert, Student, FlagFeedback
 from routes.auth import get_current_mentor
+from routes.access import get_owned_alert
 from ai_layer import generate_explanation
 from datetime import datetime
 from typing import Optional
@@ -123,10 +124,7 @@ def mark_alert_read(
     db: Session = Depends(get_db),
     mentor=Depends(get_current_mentor)
 ):
-    alert = db.query(TripwireAlert).filter(TripwireAlert.alert_id == alert_id).first()
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
-
+    alert = get_owned_alert(db, alert_id, mentor)
     alert.is_read = True
     db.commit()
     return {"success": True, "alert_id": alert.alert_id, "is_read": True}
@@ -140,11 +138,7 @@ def get_alert(
     db: Session = Depends(get_db),
     mentor=Depends(get_current_mentor)
 ):
-    alert = db.query(TripwireAlert).filter(
-        TripwireAlert.alert_id == alert_id
-    ).first()
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
+    alert = get_owned_alert(db, alert_id, mentor)
 
     if not getattr(alert, "is_read", False):
         alert.is_read = True
@@ -236,9 +230,7 @@ def submit_alert_feedback(
     Submits or updates faculty feedback for a Tripwire alert.
     Feeds the closed-loop System Trust Score tracking engine.
     """
-    alert = db.query(TripwireAlert).filter(TripwireAlert.alert_id == alert_id).first()
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
+    alert = get_owned_alert(db, alert_id, mentor)
 
     valid_accurate = ["accurate", "false_positive", "too_late", "unclear"]
     if payload.was_accurate not in valid_accurate:
@@ -294,6 +286,8 @@ def get_alert_feedback(
     mentor=Depends(get_current_mentor)
 ):
     """Retrieves faculty feedback for a specific alert."""
+    alert = get_owned_alert(db, alert_id, mentor)
+
     fb = db.query(FlagFeedback).filter(
         FlagFeedback.alert_id == alert_id,
         FlagFeedback.faculty_id == mentor.mentor_id
@@ -327,11 +321,7 @@ def mark_alert_excused(
     Human override endpoint: Allows faculty to mark this alert as partially or fully excused
     due to approved medical leave, college event, or verified personal circumstance.
     """
-    alert = db.query(TripwireAlert).filter(
-        TripwireAlert.alert_id == alert_id
-    ).first()
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
+    alert = get_owned_alert(db, alert_id, mentor)
 
     alert.excused_flag = True
     alert.status = "monitoring"  # De-escalate from active tripwire to monitoring
@@ -353,11 +343,7 @@ def ai_explain(
     db: Session = Depends(get_db),
     mentor=Depends(get_current_mentor)
 ):
-    alert = db.query(TripwireAlert).filter(
-        TripwireAlert.alert_id == alert_id
-    ).first()
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
+    alert = get_owned_alert(db, alert_id, mentor)
 
     student = db.query(Student).filter(
         Student.student_id == alert.student_id

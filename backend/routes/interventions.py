@@ -7,6 +7,7 @@ from typing import Optional
 
 from database import get_db, Intervention, TripwireAlert, Student
 from routes.auth import get_current_mentor
+from routes.access import get_owned_alert, get_owned_student
 from dvi_engine import compute_dvi
 
 router = APIRouter(prefix="/interventions", tags=["interventions"])
@@ -28,11 +29,7 @@ def create_intervention(
     db: Session = Depends(get_db),
     mentor=Depends(get_current_mentor)
 ):
-    alert = db.query(TripwireAlert).filter(
-        TripwireAlert.alert_id == body.alert_id
-    ).first()
-    if not alert:
-        raise HTTPException(status_code=404, detail="Alert not found")
+    alert = get_owned_alert(db, body.alert_id, mentor)
 
     contact_dt = datetime.utcnow()
     if body.contact_date:
@@ -96,16 +93,14 @@ def get_intervention(
     db: Session = Depends(get_db),
     mentor=Depends(get_current_mentor)
 ):
+    alert = get_owned_alert(db, alert_id, mentor)
+
     intervention = db.query(Intervention).filter(
         Intervention.alert_id == alert_id
     ).order_by(Intervention.contact_date.desc()).first()
 
     if not intervention:
         return {"intervention": None}
-
-    alert = db.query(TripwireAlert).filter(
-        TripwireAlert.alert_id == alert_id
-    ).first()
 
     return {
         "intervention": {
@@ -130,8 +125,10 @@ def get_student_interventions(
     mentor=Depends(get_current_mentor)
 ):
     """Retrieve all intervention history for a given student."""
+    student = get_owned_student(db, student_id, mentor)
+
     interventions = db.query(Intervention).join(TripwireAlert).filter(
-        TripwireAlert.student_id == student_id
+        TripwireAlert.student_id == student.student_id
     ).order_by(Intervention.contact_date.desc()).all()
 
     results = []

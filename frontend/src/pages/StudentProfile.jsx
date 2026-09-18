@@ -6,10 +6,11 @@ import {
 } from 'recharts'
 import { studentsAPI, interventionsAPI } from '../api/client'
 import { StatusBadge, VelocityLabel, Spinner, LoadingScreen, HumanOverrideNote, PrototypeThresholdBadge } from '../components/Shared'
+import LogTelemetryModal from '../components/LogTelemetryModal'
 import {
   ArrowLeft, AlertTriangle, TrendingDown, TrendingUp, Clock,
   BookOpen, Sunrise, Activity, Shield, ShieldCheck, HelpCircle,
-  CheckCircle2, Plus, Calendar, UserCheck, AlertCircle
+  CheckCircle2, Plus, Calendar, UserCheck, AlertCircle, Zap, RotateCcw
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -141,6 +142,51 @@ export default function StudentProfile() {
   const [pulseNote, setPulseNote] = useState('')
   const [submittingPulse, setSubmittingPulse] = useState(false)
 
+  // Live Telemetry Modal state
+  const [showTelemetryModal, setShowTelemetryModal] = useState(false)
+
+  // Live Pitch Simulation state
+  const [isSimulating, setIsSimulating] = useState(false)
+
+  const handleSimulateDrift = async () => {
+    try {
+      setIsSimulating(true)
+      const res = await studentsAPI.simulateDrift(id)
+      toast.error(res.data.summary || 'Simulated behavioral drift: DVI crossed Tripwire!')
+      await reloadData()
+    } catch (e) {
+      toast.error('Failed to simulate drift.')
+    } finally {
+      setIsSimulating(false)
+    }
+  }
+
+  const handleSimulateRecovery = async () => {
+    try {
+      setIsSimulating(true)
+      const res = await studentsAPI.simulateRecovery(id)
+      toast.success(res.data.summary || 'Simulated mentor recovery: DVI normalized.')
+      await reloadData()
+    } catch (e) {
+      toast.error('Failed to simulate recovery.')
+    } finally {
+      setIsSimulating(false)
+    }
+  }
+
+  const handleSimulateReset = async () => {
+    try {
+      setIsSimulating(true)
+      const res = await studentsAPI.simulateReset(id)
+      toast.success(res.data.message || 'Simulation reset to baseline.')
+      await reloadData()
+    } catch (e) {
+      toast.error('Failed to reset simulation.')
+    } finally {
+      setIsSimulating(false)
+    }
+  }
+
   const reloadData = () => {
     return Promise.all([
       studentsAPI.profile(id),
@@ -262,6 +308,15 @@ export default function StudentProfile() {
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <button
+              id="log-telemetry-btn"
+              className="btn btn-primary btn-sm"
+              onClick={() => setShowTelemetryModal(true)}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <Activity size={14} /> Log Activity / Attendance
+            </button>
+
+            <button
               id="pulse-check-btn"
               className="btn btn-ghost btn-sm"
               onClick={() => setShowPulseModal(true)}
@@ -278,6 +333,41 @@ export default function StudentProfile() {
             >
               <ShieldCheck size={14} color="var(--color-normal)" />
               Record Excused Leave
+            </button>
+
+            {profile.dvi < 70 ? (
+              <button
+                id="simulate-drift-btn"
+                className="btn btn-ghost btn-sm"
+                onClick={handleSimulateDrift}
+                disabled={isSimulating}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#ef4444', border: '1px solid rgba(239,68,68,0.35)' }}
+                title="Inject live multi-day absences and delayed submissions to demonstrate instant early warning to judges"
+              >
+                <Zap size={13} /> {isSimulating ? 'Simulating...' : '⚡ Simulate Crisis (Demo)'}
+              </button>
+            ) : (
+              <button
+                id="simulate-recovery-btn"
+                className="btn btn-ghost btn-sm"
+                onClick={handleSimulateRecovery}
+                disabled={isSimulating}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#10b981', border: '1px solid rgba(16,185,129,0.35)' }}
+                title="Log simulated faculty mentoring intervention and positive attendance rebound"
+              >
+                <Zap size={13} /> {isSimulating ? 'Simulating...' : '⚡ Simulate Recovery (Demo)'}
+              </button>
+            )}
+
+            <button
+              id="simulate-reset-btn"
+              className="btn btn-ghost btn-sm"
+              onClick={handleSimulateReset}
+              disabled={isSimulating}
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              title="Reset simulated data and restore baseline standing"
+            >
+              <RotateCcw size={13} /> Reset Baseline
             </button>
 
             {profile.alert_id && (
@@ -867,6 +957,14 @@ export default function StudentProfile() {
           </div>
         </div>
       )}
+
+      {/* Live Telemetry Logger Modal */}
+      <LogTelemetryModal
+        isOpen={showTelemetryModal}
+        onClose={() => setShowTelemetryModal(false)}
+        student={profile ? { ...profile, student_id: profile.student_id || id } : null}
+        onTelemetryLogged={() => reloadData()}
+      />
     </div>
   )
 }
