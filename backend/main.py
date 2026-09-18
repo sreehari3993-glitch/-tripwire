@@ -62,12 +62,24 @@ async def add_security_headers(request: Request, call_next):
 def on_startup():
     init_db()
     try:
-        from database import SessionLocal, Student
+        from database import SessionLocal, Student, Mentor
+        from routes.auth import pwd_context
         db = SessionLocal()
         if db.query(Student).count() == 0:
             print("[*] Database is empty. Seeding initial demo data...")
             from seed_data import run_seed
             run_seed()
+        else:
+            # Self-healing: verify mentor hashes and repair if legacy/corrupted
+            for mid in ["FAC001", "FAC002"]:
+                m = db.query(Mentor).filter(Mentor.mentor_id == mid).first()
+                if m:
+                    try:
+                        if not pwd_context.identify(m.password_hash):
+                            m.password_hash = pwd_context.hash("tripwire123")
+                    except Exception:
+                        m.password_hash = pwd_context.hash("tripwire123")
+            db.commit()
         db.close()
     except Exception as e:
         print(f"Startup seed notice: {e}")
