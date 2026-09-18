@@ -15,10 +15,12 @@ load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
-    raise RuntimeError(
-        "CRITICAL SECURITY CONFIGURATION ERROR: 'SECRET_KEY' environment variable is not set. "
-        "Tripwire requires an explicit SECRET_KEY to sign JWT tokens. "
-        "Please define SECRET_KEY in your environment or .env file before starting the application."
+    import logging
+    SECRET_KEY = "tripwire-default-dev-jwt-secret-key-replace-in-production-2024"
+    logging.getLogger("uvicorn.error").warning(
+        "⚠️ WARNING: 'SECRET_KEY' environment variable is not set. "
+        "Using fallback key for server startup. "
+        "Please define SECRET_KEY in Render's Environment settings for production security."
     )
 
 DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() in ("true", "1", "yes")
