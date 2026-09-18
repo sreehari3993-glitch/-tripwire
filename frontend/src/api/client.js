@@ -2,8 +2,8 @@ import axios from 'axios'
 
 export const BASE_URL = (
   import.meta.env.VITE_API_URL ||
-  (typeof window !== 'undefined' && window.location.hostname
-    ? `http://${window.location.hostname}:8000`
+  (typeof window !== 'undefined' && window.location.hostname && !['localhost', '127.0.0.1'].includes(window.location.hostname)
+    ? 'https://tripwire-z555.onrender.com'
     : 'http://localhost:8000')
 ).replace(/\/+$/, '')
 
