@@ -11,14 +11,14 @@ import toast from 'react-hot-toast'
 
 // Form outcome options as specified in prompt section 12
 const OUTCOMES = [
-  { value: 'Contacted',                  icon: '💬', label: 'Contacted', desc: 'Initial check-in conversation completed' },
-  { value: 'Student requested support',   icon: '🙋', label: 'Student Requested Support', desc: 'Student asked for academic or personal assistance' },
-  { value: 'Academic issue identified',  icon: '📚', label: 'Academic Issue Identified', desc: 'Difficulty with coursework, lab deadlines, or concepts' },
-  { value: 'Personal difficulty reported',icon: '🏠', label: 'Personal Difficulty Reported', desc: 'Commute, family, health, or personal circumstance' },
-  { value: 'Referred to support service',icon: '🤝', label: 'Referred to Support Service', desc: 'Referred to counseling, tutoring, or financial aid' },
-  { value: 'Monitoring',                 icon: '🟡', label: 'Monitoring', desc: 'Agreed on check-in schedule; monitoring next week' },
-  { value: 'Improved',                   icon: '🟢', label: 'Improved', desc: 'Behavior stabilized; student catching up' },
-  { value: 'No response',                icon: '⏳', label: 'No Response', desc: 'Attempted contact; awaiting student reply' },
+  { value: 'Contacted', icon: '💬', label: 'Contacted', desc: 'Initial check-in conversation completed' },
+  { value: 'Student requested support', icon: '🙋', label: 'Student Requested Support', desc: 'Student asked for academic or personal assistance' },
+  { value: 'Academic issue identified', icon: '📚', label: 'Academic Issue Identified', desc: 'Difficulty with coursework, lab deadlines, or concepts' },
+  { value: 'Personal difficulty reported', icon: '🏠', label: 'Personal Difficulty Reported', desc: 'Commute, family, health, or personal circumstance' },
+  { value: 'Referred to support service', icon: '🤝', label: 'Referred to Support Service', desc: 'Referred to counseling, tutoring, or financial aid' },
+  { value: 'Monitoring', icon: '🟡', label: 'Monitoring', desc: 'Agreed on check-in schedule; monitoring next week' },
+  { value: 'Improved', icon: '🟢', label: 'Improved', desc: 'Behavior stabilized; student catching up' },
+  { value: 'No response', icon: '⏳', label: 'No Response', desc: 'Attempted contact; awaiting student reply' },
 ]
 
 const CONTACT_METHODS = [
@@ -188,7 +188,7 @@ export default function AlertDetail() {
   const dvi = alert.dvi_score
   const dviColor =
     dvi >= 70 ? '#ef4444' :
-    dvi >= 50 ? '#f59e0b' : '#10b981'
+      dvi >= 50 ? '#f59e0b' : '#10b981'
 
   return (
     <div>
@@ -354,9 +354,9 @@ export default function AlertDetail() {
               }}>
                 <span style={{ fontSize: 24 }}>
                   {alert.pulse.rating === 1 ? '😫' :
-                   alert.pulse.rating === 2 ? '😟' :
-                   alert.pulse.rating === 3 ? '😐' :
-                   alert.pulse.rating === 4 ? '🙂' : '🌟'}
+                    alert.pulse.rating === 2 ? '😟' :
+                      alert.pulse.rating === 3 ? '😐' :
+                        alert.pulse.rating === 4 ? '🙂' : '🌟'}
                 </span>
                 <div>
                   <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Self-Rating</div>
@@ -744,15 +744,15 @@ export default function AlertDetail() {
                     padding: '2px 8px',
                     borderRadius: 6,
                     background: feedback.was_accurate === 'accurate' ? 'rgba(16, 185, 129, 0.15)' :
-                                feedback.was_accurate === 'false_positive' ? 'rgba(239, 68, 68, 0.15)' :
-                                'rgba(245, 158, 11, 0.15)',
+                      feedback.was_accurate === 'false_positive' ? 'rgba(239, 68, 68, 0.15)' :
+                        'rgba(245, 158, 11, 0.15)',
                     color: feedback.was_accurate === 'accurate' ? 'var(--color-normal)' :
-                           feedback.was_accurate === 'false_positive' ? 'var(--color-tripwire)' :
-                           'var(--color-monitor)'
+                      feedback.was_accurate === 'false_positive' ? 'var(--color-tripwire)' :
+                        'var(--color-monitor)'
                   }}>
                     {feedback.was_accurate === 'accurate' ? '🎯 Accurate Flag' :
-                     feedback.was_accurate === 'false_positive' ? '⚠️ False Positive' :
-                     feedback.was_accurate === 'too_late' ? '⏳ Too Late' : '❓ Unclear Signal'}
+                      feedback.was_accurate === 'false_positive' ? '⚠️ False Positive' :
+                        feedback.was_accurate === 'too_late' ? '⏳ Too Late' : '❓ Unclear Signal'}
                   </span>
                   <span style={{ fontSize: 13, color: '#fbbf24', fontWeight: 700 }}>
                     {'★'.repeat(feedback.was_useful)}{'☆'.repeat(5 - feedback.was_useful)} ({feedback.was_useful}/5 Usefulness)
@@ -834,10 +834,10 @@ export default function AlertDetail() {
                   ))}
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>
                     {feedbackUseful === 1 ? '1 - Not useful' :
-                     feedbackUseful === 2 ? '2 - Marginal' :
-                     feedbackUseful === 3 ? '3 - Moderately useful' :
-                     feedbackUseful === 4 ? '4 - Very useful' :
-                     '5 - Essential / critical catch'}
+                      feedbackUseful === 2 ? '2 - Marginal' :
+                        feedbackUseful === 3 ? '3 - Moderately useful' :
+                          feedbackUseful === 4 ? '4 - Very useful' :
+                            '5 - Essential / critical catch'}
                   </span>
                 </div>
               </div>

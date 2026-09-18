@@ -1,7 +1,8 @@
 """
 Tripwire FastAPI Backend — main.py
 """
-from fastapi import FastAPI
+import os
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
@@ -22,14 +23,39 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS — allow React dev server and Vercel production deployment
+# ── SECURITY: RESTRICTED CORS WHITELIST ─────────────────────────────────────
+DEFAULT_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000"
+]
+env_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+allowed_origins = list(set(DEFAULT_ORIGINS + env_origins))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
+    allow_origins=allowed_origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
 )
+
+
+# ── SECURITY: HTTP RESPONSE HEADERS MIDDLEWARE ──────────────────────────────
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    """Enforces essential OWASP security headers across all API responses."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
+    return response
 
 # Initialize DB on startup
 @app.on_event("startup")
@@ -78,3 +104,20 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "healthy"}
+
+
+if __name__ == "__main__":
+    import sys
+    import uvicorn
+    # Ensure current directory is on Python path
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    if current_dir not in sys.path:
+        sys.path.insert(0, current_dir)
+    print("\n=======================================================")
+    print("  TRIPWIRE FastAPI Backend Starting...")
+    print("  URL:           http://127.0.0.1:8000 (or http://localhost:8000)")
+    print("  API Docs:      http://127.0.0.1:8000/docs")
+    print("  Frontend UI:   http://127.0.0.1:5173")
+    print("=======================================================\n")
+    uvicorn.run(app, host="127.0.0.1", port=8000)
+

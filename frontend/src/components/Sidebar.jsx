@@ -19,8 +19,8 @@ export default function Sidebar() {
 
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/students',  icon: Users,           label: 'Students'  },
-    { to: '/alerts',    icon: Bell,             label: 'Tripwire Alerts' },
+    { to: '/students', icon: Users, label: 'Students' },
+    { to: '/alerts', icon: Bell, label: 'Tripwire Alerts' },
   ]
 
   return (

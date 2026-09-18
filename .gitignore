@@ -14,8 +14,8 @@ venv/
 env/
 .env
 
-# Database
-# (tripwire.db is tracked for seamless cloud deployment)
+# Database (keep schema, not data)
+backend/tripwire.db
 
 # Node / Frontend
 node_modules/
@@ -41,3 +41,8 @@ backend/scripts/weight_validation_report.md
 backend/.env
 *.pem
 *.key
+
+# Local backups & archives
+frontend - Copy/
+*.zip
+tripwire.db

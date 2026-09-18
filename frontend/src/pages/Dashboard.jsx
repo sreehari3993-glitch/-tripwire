@@ -37,25 +37,25 @@ export default function Dashboard() {
 
   if (loading) return <LoadingScreen text="Loading Tripwire analytics dashboard..." />
 
-  const tripwireStudents   = students.filter(s => s.status === 'tripwire')
+  const tripwireStudents = students.filter(s => s.status === 'tripwire')
   const monitoringStudents = students.filter(s => s.status === 'monitoring')
   const recoveringStudents = students.filter(s => s.status === 'recovering')
 
   // Prepare DVI distribution data
   const distData = summary?.distribution ? [
-    { range: '0–20',   count: summary.distribution['0_20'] || 0,   fill: '#10b981' },
-    { range: '21–40',  count: summary.distribution['21_40'] || 0,  fill: '#10b981' },
-    { range: '41–60',  count: summary.distribution['41_60'] || 0,  fill: '#f59e0b' },
-    { range: '61–80',  count: summary.distribution['61_80'] || 0,  fill: '#ef4444' },
+    { range: '0–20', count: summary.distribution['0_20'] || 0, fill: '#10b981' },
+    { range: '21–40', count: summary.distribution['21_40'] || 0, fill: '#10b981' },
+    { range: '41–60', count: summary.distribution['41_60'] || 0, fill: '#f59e0b' },
+    { range: '61–80', count: summary.distribution['61_80'] || 0, fill: '#ef4444' },
     { range: '81–100', count: summary.distribution['81_100'] || 0, fill: '#dc2626' },
   ] : []
 
   // Synthetic cohort timeline trends over last 14 days
   const cohortTrendData = [
-    { day: 'Sep 2',  normal: 36, monitor: 10, tripwire: 2, recovering: 2 },
-    { day: 'Sep 4',  normal: 35, monitor: 11, tripwire: 2, recovering: 2 },
-    { day: 'Sep 7',  normal: 32, monitor: 13, tripwire: 3, recovering: 2 },
-    { day: 'Sep 9',  normal: 30, monitor: 14, tripwire: 4, recovering: 2 },
+    { day: 'Sep 2', normal: 36, monitor: 10, tripwire: 2, recovering: 2 },
+    { day: 'Sep 4', normal: 35, monitor: 11, tripwire: 2, recovering: 2 },
+    { day: 'Sep 7', normal: 32, monitor: 13, tripwire: 3, recovering: 2 },
+    { day: 'Sep 9', normal: 30, monitor: 14, tripwire: 4, recovering: 2 },
     { day: 'Sep 11', normal: 28, monitor: 16, tripwire: 4, recovering: 2 },
     { day: 'Sep 14', normal: 27, monitor: 17, tripwire: 4, recovering: 2 },
     { day: 'Sep 16', normal: summary?.normal || 26, monitor: summary?.monitoring || 19, tripwire: summary?.tripwire || 3, recovering: summary?.recovering || 2 },
@@ -498,8 +498,8 @@ export default function Dashboard() {
                   <AreaChart data={trustData?.trust_score_trend || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <defs>
                       <linearGradient id="trustGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4}/>
-                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0}/>
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />

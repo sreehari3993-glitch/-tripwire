@@ -25,14 +25,14 @@ function DVIGauge({ dvi }) {
 
   const color =
     dvi >= 70 ? '#ef4444' :
-    dvi >= 50 ? '#f59e0b' : '#10b981'
+      dvi >= 50 ? '#f59e0b' : '#10b981'
 
   return (
     <div style={{ textAlign: 'center' }}>
       <svg width={size} height={size / 2 + 32} viewBox={`0 0 ${size} ${size / 2 + 20}`}>
         {/* Background arc */}
         <path
-          d={`M ${strokeWidth/2} ${size/2} A ${radius} ${radius} 0 0 1 ${size - strokeWidth/2} ${size/2}`}
+          d={`M ${strokeWidth / 2} ${size / 2} A ${radius} ${radius} 0 0 1 ${size - strokeWidth / 2} ${size / 2}`}
           fill="none"
           stroke="rgba(255,255,255,0.06)"
           strokeWidth={strokeWidth}
@@ -40,7 +40,7 @@ function DVIGauge({ dvi }) {
         />
         {/* Foreground arc */}
         <path
-          d={`M ${strokeWidth/2} ${size/2} A ${radius} ${radius} 0 0 1 ${size - strokeWidth/2} ${size/2}`}
+          d={`M ${strokeWidth / 2} ${size / 2} A ${radius} ${radius} 0 0 1 ${size - strokeWidth / 2} ${size / 2}`}
           fill="none"
           stroke={color}
           strokeWidth={strokeWidth}
@@ -212,8 +212,8 @@ export default function StudentProfile() {
 
   const dviColor =
     profile.dvi >= 70 ? '#ef4444' :
-    profile.dvi >= 50 ? '#f59e0b' :
-    profile.status === 'recovering' ? '#a855f7' : '#10b981'
+      profile.dvi >= 50 ? '#f59e0b' :
+        profile.status === 'recovering' ? '#a855f7' : '#10b981'
 
   return (
     <div>
@@ -602,9 +602,9 @@ export default function StudentProfile() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
               <span style={{ fontSize: 28 }}>
                 {profile.pulse.rating === 1 ? '😫' :
-                 profile.pulse.rating === 2 ? '😟' :
-                 profile.pulse.rating === 3 ? '😐' :
-                 profile.pulse.rating === 4 ? '🙂' : '🌟'}
+                  profile.pulse.rating === 2 ? '😟' :
+                    profile.pulse.rating === 3 ? '😐' :
+                      profile.pulse.rating === 4 ? '🙂' : '🌟'}
               </span>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: profile.pulse.rating <= 2 ? '#ef4444' : '#10b981' }}>

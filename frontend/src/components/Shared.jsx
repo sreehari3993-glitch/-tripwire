@@ -4,13 +4,13 @@ import { ShieldCheck, AlertCircle, Info } from 'lucide-react'
 export function StatusBadge({ status }) {
   const norm = (status || '').toLowerCase()
   const map = {
-    tripwire:   { cls: 'badge-tripwire',   label: '🔴 TRIPWIRE',   color: '#ef4444' },
-    monitoring: { cls: 'badge-monitor',    label: '🟡 MONITORING', color: '#f59e0b' },
+    tripwire: { cls: 'badge-tripwire', label: '🔴 TRIPWIRE', color: '#ef4444' },
+    monitoring: { cls: 'badge-monitor', label: '🟡 MONITORING', color: '#f59e0b' },
     recovering: { cls: 'badge-recovering', label: '🟣 RECOVERING', color: '#a855f7' },
-    normal:     { cls: 'badge-normal',     label: '🟢 NORMAL',     color: '#10b981' },
-    resolving:  { cls: 'badge-recovering', label: '🟣 RECOVERING', color: '#a855f7' },
-    resolved:   { cls: 'badge-normal',     label: '✅ RESOLVED',   color: '#10b981' },
-    active:     { cls: 'badge-tripwire',   label: '🔴 ACTIVE',     color: '#ef4444' },
+    normal: { cls: 'badge-normal', label: '🟢 NORMAL', color: '#10b981' },
+    resolving: { cls: 'badge-recovering', label: '🟣 RECOVERING', color: '#a855f7' },
+    resolved: { cls: 'badge-normal', label: '✅ RESOLVED', color: '#10b981' },
+    active: { cls: 'badge-tripwire', label: '🔴 ACTIVE', color: '#ef4444' },
   }
   const info = map[norm] || { cls: 'badge-normal', label: status?.toUpperCase() || 'NORMAL', color: '#10b981' }
   return (
@@ -34,11 +34,11 @@ export function StatusBadge({ status }) {
 }
 
 export function VelocityLabel({ velocity }) {
-  const up2   = velocity === '↗↗'
-  const up1   = velocity === '↗'
-  const flat  = velocity === '→'
-  const dn1   = velocity === '↘'
-  const dn2   = velocity === '↘↘'
+  const up2 = velocity === '↗↗'
+  const up1 = velocity === '↗'
+  const flat = velocity === '→'
+  const dn1 = velocity === '↘'
+  const dn2 = velocity === '↘↘'
 
   let cls = 'velocity-flat'
   let label = 'Stable'
@@ -59,7 +59,7 @@ export function DVIBar({ dvi }) {
   const val = Math.min(Math.max(Number(dvi) || 0, 0), 100)
   const color =
     val >= 70 ? '#ef4444' :
-    val >= 50 ? '#f59e0b' : '#10b981'
+      val >= 50 ? '#f59e0b' : '#10b981'
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 140 }}>

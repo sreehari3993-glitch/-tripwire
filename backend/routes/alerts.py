@@ -50,6 +50,7 @@ def list_alerts(
             "trigger_date": alert.trigger_date.isoformat(),
             "status": alert.status,
             "excused_flag": alert.excused_flag,
+            "is_read": getattr(alert, "is_read", False),
             "attendance_drift": alert.attendance_drift,
             "submission_drift": alert.submission_drift,
             "engagement_drift": alert.engagement_drift,
@@ -57,6 +58,78 @@ def list_alerts(
         })
 
     return {"alerts": result, "total": len(result)}
+
+
+@router.get("/unread-count")
+def get_unread_count(
+    db: Session = Depends(get_db),
+    mentor=Depends(get_current_mentor)
+):
+    mentor_students = db.query(Student).filter(
+        Student.mentor_id == mentor.mentor_id
+    ).all()
+    student_ids = [s.student_id for s in mentor_students]
+
+    unread_alerts = db.query(TripwireAlert).filter(
+        TripwireAlert.student_id.in_(student_ids),
+        TripwireAlert.status == "active",
+        TripwireAlert.is_read == False
+    ).order_by(TripwireAlert.trigger_date.desc()).all()
+
+    previews = []
+    for alert in unread_alerts[:5]:
+        student = db.query(Student).filter(Student.student_id == alert.student_id).first()
+        previews.append({
+            "alert_id": alert.alert_id,
+            "student_id": alert.student_id,
+            "student_name": student.name if student else "Unknown",
+            "section": student.section if student else "",
+            "dvi_score": round(alert.dvi_score, 1),
+            "trigger_date": alert.trigger_date.isoformat(),
+            "status": alert.status
+        })
+
+    return {
+        "unread_count": len(unread_alerts),
+        "recent_unread": previews
+    }
+
+
+@router.post("/mark-all-read")
+def mark_all_alerts_read(
+    db: Session = Depends(get_db),
+    mentor=Depends(get_current_mentor)
+):
+    mentor_students = db.query(Student).filter(
+        Student.mentor_id == mentor.mentor_id
+    ).all()
+    student_ids = [s.student_id for s in mentor_students]
+
+    unread_alerts = db.query(TripwireAlert).filter(
+        TripwireAlert.student_id.in_(student_ids),
+        TripwireAlert.is_read == False
+    ).all()
+
+    for alert in unread_alerts:
+        alert.is_read = True
+    db.commit()
+
+    return {"success": True, "marked_count": len(unread_alerts)}
+
+
+@router.post("/{alert_id}/mark-read")
+def mark_alert_read(
+    alert_id: int,
+    db: Session = Depends(get_db),
+    mentor=Depends(get_current_mentor)
+):
+    alert = db.query(TripwireAlert).filter(TripwireAlert.alert_id == alert_id).first()
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    alert.is_read = True
+    db.commit()
+    return {"success": True, "alert_id": alert.alert_id, "is_read": True}
 
 
 from dvi_engine import compute_counterfactual, compute_dvi
@@ -72,6 +145,10 @@ def get_alert(
     ).first()
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+
+    if not getattr(alert, "is_read", False):
+        alert.is_read = True
+        db.commit()
 
     student = db.query(Student).filter(
         Student.student_id == alert.student_id
@@ -111,6 +188,7 @@ def get_alert(
         "trigger_date": alert.trigger_date.isoformat(),
         "status": alert.status,
         "excused_flag": alert.excused_flag,
+        "is_read": True,
         "prototype_threshold": 70,
         "components": {
             "attendance": {
@@ -195,7 +273,7 @@ def submit_alert_feedback(
     db.refresh(feedback_obj)
 
     return {
-        "success": True,
+        "succes": True,
         "message": "Faculty feedback recorded. System Trust metrics updated.",
         "feedback": {
             "id": feedback_obj.id,

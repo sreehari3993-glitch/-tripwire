@@ -54,8 +54,8 @@ export default function DemoModal({ isOpen, onClose }) {
   const dvi = stage.dvi
   const dviColor =
     dvi >= 70 ? '#ef4444' :
-    dvi >= 50 ? '#f59e0b' :
-    stage.status === 'recovering' ? '#a855f7' : '#10b981'
+      dvi >= 50 ? '#f59e0b' :
+        stage.status === 'recovering' ? '#a855f7' : '#10b981'
 
   const handleNext = () => {
     if (currentIdx < stages.length - 1) setCurrentIdx(currentIdx + 1)
@@ -150,8 +150,8 @@ export default function DemoModal({ isOpen, onClose }) {
             const isDone = i < currentIdx
             const stepColor =
               stg.dvi >= 70 ? '#ef4444' :
-              stg.dvi >= 50 ? '#f59e0b' :
-              stg.status === 'recovering' ? '#a855f7' : '#10b981'
+                stg.dvi >= 50 ? '#f59e0b' :
+                  stg.status === 'recovering' ? '#a855f7' : '#10b981'
 
             return (
               <React.Fragment key={stg.stage}>

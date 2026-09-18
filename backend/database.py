@@ -123,6 +123,7 @@ class TripwireAlert(Base):
     reason_json       = Column(Text, default="{}")   # JSON details
     status            = Column(String, default="active")  # active / resolved / monitoring
     excused_flag      = Column(Boolean, default=False)
+    is_read           = Column(Boolean, default=False)
 
     student       = relationship("Student", back_populates="alerts")
     interventions = relationship("Intervention", back_populates="alert")
