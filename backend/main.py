@@ -30,7 +30,9 @@ DEFAULT_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "http://localhost:8000",
-    "http://127.0.0.1:8000"
+    "http://127.0.0.1:8000",
+    "https://frontend-6jw03o2g9-sreehari3993-glitch.vercel.app",
+    "https://frontend-sreehari3993-glitch.vercel.app"
 ]
 env_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 allowed_origins = list(set(DEFAULT_ORIGINS + env_origins))
@@ -65,21 +67,33 @@ def on_startup():
         from database import SessionLocal, Student, Mentor
         from routes.auth import pwd_context
         db = SessionLocal()
+
+        # Unconditionally ensure default faculty mentors exist in all environments
+        for mid, mname, mdept in [
+            ("FAC001", "Dr. Pradeep Kumar", "Computer Science"),
+            ("FAC002", "Prof. Ananya Sen", "Electronics")
+        ]:
+            m = db.query(Mentor).filter(Mentor.mentor_id == mid).first()
+            if not m:
+                m = Mentor(
+                    mentor_id=mid,
+                    name=mname,
+                    password_hash=pwd_context.hash("tripwire123"),
+                    department=mdept
+                )
+                db.add(m)
+            else:
+                try:
+                    if not pwd_context.identify(m.password_hash):
+                        m.password_hash = pwd_context.hash("tripwire123")
+                except Exception:
+                    m.password_hash = pwd_context.hash("tripwire123")
+        db.commit()
+
         if db.query(Student).count() == 0:
             print("[*] Database is empty. Seeding initial demo data...")
             from seed_data import run_seed
             run_seed()
-        else:
-            # Self-healing: verify mentor hashes and repair if legacy/corrupted
-            for mid in ["FAC001", "FAC002"]:
-                m = db.query(Mentor).filter(Mentor.mentor_id == mid).first()
-                if m:
-                    try:
-                        if not pwd_context.identify(m.password_hash):
-                            m.password_hash = pwd_context.hash("tripwire123")
-                    except Exception:
-                        m.password_hash = pwd_context.hash("tripwire123")
-            db.commit()
         db.close()
     except Exception as e:
         print(f"Startup seed notice: {e}")

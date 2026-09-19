@@ -1,12 +1,23 @@
 import axios from 'axios'
 
-const isLocalDirect = typeof window !== 'undefined' && 
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
-  (window.location.port === '5173' || window.location.port === '3000')
+const rawEnvUrl = import.meta.env.VITE_API_URL
+const isLocalhost = typeof window !== 'undefined' && (
+  !window.location.hostname ||
+  window.location.hostname === 'localhost' ||
+  window.location.hostname === '127.0.0.1' ||
+  window.location.hostname === '0.0.0.0'
+)
+const isCloudflareTunnel = typeof window !== 'undefined' &&
+  window.location.hostname.endsWith('.trycloudflare.com')
 
 export const BASE_URL = (
-  import.meta.env.VITE_API_URL ||
-  (isLocalDirect ? 'http://localhost:8000' : '')
+  (rawEnvUrl && rawEnvUrl !== 'undefined' && rawEnvUrl.trim() !== '')
+    ? rawEnvUrl.trim()
+    : isCloudflareTunnel
+      ? '' // Tunnel uses Vite's built-in proxy to port 8000
+      : isLocalhost
+        ? 'http://localhost:8000'
+        : 'https://tripwire-z555.onrender.com'
 ).replace(/\/+$/, '')
 
 const api = axios.create({ baseURL: BASE_URL })
@@ -18,11 +29,11 @@ api.interceptors.request.use((config) => {
   return config
 })
 
-// Redirect to login on 401
+// Redirect to login on 401 for authenticated session expiry (excluding the login endpoint itself)
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    if (err.response?.status === 401 && !err.config?.url?.includes('/auth/login')) {
       localStorage.removeItem('tripwire_token')
       localStorage.removeItem('tripwire_mentor')
       window.location.href = '/login'

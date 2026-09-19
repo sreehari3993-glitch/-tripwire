@@ -111,8 +111,8 @@ def login(
         (Mentor.mentor_id == uname) | (Mentor.mentor_id == form_data.username.strip())
     ).first()
 
-    # Auto-seed-on-first-login convenience strictly gated behind DEMO_MODE env var
-    if DEMO_MODE and not mentor and uname in ["FAC001", "MTR001"]:
+    # Auto-provision default faculty accounts and seed DB if empty
+    if not mentor and uname in ["FAC001", "FAC002", "MTR001"]:
         try:
             from database import Student
             if db.query(Student).count() == 0:
@@ -127,11 +127,13 @@ def login(
             (Mentor.mentor_id == uname) | (Mentor.mentor_id == "FAC001")
         ).first()
         if not mentor:
+            mname = "Prof. Ananya Sen" if uname == "FAC002" else "Dr. Pradeep Kumar"
+            mdept = "Electronics" if uname == "FAC002" else "Computer Science"
             mentor = Mentor(
-                mentor_id="FAC001",
-                name="Dr. Pradeep Kumar",
+                mentor_id=uname,
+                name=mname,
                 password_hash=pwd_context.hash("tripwire123"),
-                department="Computer Science"
+                department=mdept
             )
             db.add(mentor)
             db.commit()
