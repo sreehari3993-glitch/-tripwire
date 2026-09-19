@@ -1,10 +1,12 @@
 import axios from 'axios'
 
+const isLocalDirect = typeof window !== 'undefined' && 
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') &&
+  (window.location.port === '5173' || window.location.port === '3000')
+
 export const BASE_URL = (
   import.meta.env.VITE_API_URL ||
-  (typeof window !== 'undefined' && window.location.hostname
-    ? `http://${window.location.hostname}:8000`
-    : 'http://localhost:8000')
+  (isLocalDirect ? 'http://localhost:8000' : '')
 ).replace(/\/+$/, '')
 
 const api = axios.create({ baseURL: BASE_URL })
