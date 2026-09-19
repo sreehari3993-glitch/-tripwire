@@ -191,8 +191,8 @@ export default function Dashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Activity size={16} color="var(--brand-glow)" />
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-              <strong>DVI Operationalization:</strong> DVI = 0.40(Attendance Drift) + 0.35(Submission Delay Drift) + 0.25(Engagement Decline).
-              Thresholds: <span style={{ color: '#ef4444', fontWeight: 700 }}>&ge;70 Tripwire</span>, <span style={{ color: '#f59e0b', fontWeight: 700 }}>50–69 Monitoring</span>, <span style={{ color: '#10b981', fontWeight: 700 }}>&lt;50 Normal</span>.
+              <strong>DVI Operationalization:</strong> DVI = 0.50(Attendance Drift) + 0.30(Submission Delay Drift) + 0.20(Engagement Decline).
+              Thresholds: <span style={{ color: '#ef4444', fontWeight: 700 }}>&ge;70 Tripwire</span>, <span style={{ color: '#f59e0b', fontWeight: 700 }}>50–69 Monitoring</span>, <span style={{ color: '#fb923c', fontWeight: 700 }}>35–49 Watch</span>, <span style={{ color: '#10b981', fontWeight: 700 }}>&lt;35 Normal</span>.
             </div>
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', fontStyle: 'italic' }}>

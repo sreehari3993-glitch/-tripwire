@@ -648,23 +648,29 @@ export default function StudentProfile() {
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
               <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Attendance Drift (40%)</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
+                  Attendance Drift ({Math.round((profile?.weights?.attendance ?? 0.50) * 100)}%)
+                </div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#6366f1', fontFamily: 'var(--font-mono)' }}>
-                  {signals.attendance.score} pts &times; 0.40 = {profile.dvi_breakdown.attendance_component}
+                  {signals.attendance.score} pts &times; {(profile?.weights?.attendance ?? 0.50).toFixed(2)} = {profile.dvi_breakdown?.attendance_component}
                 </div>
               </div>
 
               <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Submission Delay Drift (35%)</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
+                  Submission Delay Drift ({Math.round((profile?.weights?.submission ?? 0.30) * 100)}%)
+                </div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#f59e0b', fontFamily: 'var(--font-mono)' }}>
-                  {signals.submission.score} pts &times; 0.35 = {profile.dvi_breakdown.submission_component}
+                  {signals.submission.score} pts &times; {(profile?.weights?.submission ?? 0.30).toFixed(2)} = {profile.dvi_breakdown?.submission_component}
                 </div>
               </div>
 
               <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border-subtle)' }}>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>Engagement Drop (25%)</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
+                  Engagement Drop ({Math.round((profile?.weights?.engagement ?? 0.20) * 100)}%)
+                </div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#06b6d4', fontFamily: 'var(--font-mono)' }}>
-                  {signals.engagement.score} pts &times; 0.25 = {profile.dvi_breakdown.engagement_component}
+                  {signals.engagement.score} pts &times; {(profile?.weights?.engagement ?? 0.20).toFixed(2)} = {profile.dvi_breakdown?.engagement_component}
                 </div>
               </div>
             </div>

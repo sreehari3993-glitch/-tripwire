@@ -6,6 +6,7 @@ export function StatusBadge({ status }) {
   const map = {
     tripwire: { cls: 'badge-tripwire', label: '🔴 TRIPWIRE', color: '#ef4444' },
     monitoring: { cls: 'badge-monitor', label: '🟡 MONITORING', color: '#f59e0b' },
+    watch: { cls: 'badge-monitor', label: '🟠 WATCH', color: '#fb923c' },
     recovering: { cls: 'badge-recovering', label: '🟣 RECOVERING', color: '#a855f7' },
     normal: { cls: 'badge-normal', label: '🟢 NORMAL', color: '#10b981' },
     resolving: { cls: 'badge-recovering', label: '🟣 RECOVERING', color: '#a855f7' },

@@ -312,7 +312,7 @@ export default function AlertDetail() {
               display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                DVI = 0.40({Math.round(components.attendance.score)}) + 0.35({Math.round(components.submission.score)}) + 0.25({Math.round(components.engagement.score)})
+                DVI = {(components.attendance.weight ?? 0.50).toFixed(2)}({Math.round(components.attendance.score)}) + {(components.submission.weight ?? 0.30).toFixed(2)}({Math.round(components.submission.score)}) + {(components.engagement.weight ?? 0.20).toFixed(2)}({Math.round(components.engagement.score)})
               </span>
               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 900, fontSize: 18, color: dviColor }}>
                 = {Math.round(

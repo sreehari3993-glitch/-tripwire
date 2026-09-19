@@ -130,7 +130,7 @@ def mark_alert_read(
     return {"success": True, "alert_id": alert.alert_id, "is_read": True}
 
 
-from dvi_engine import compute_counterfactual, compute_dvi
+from dvi_engine import compute_counterfactual, compute_dvi, W_ATTENDANCE, W_SUBMISSION, W_ENGAGEMENT
 
 @router.get("/{alert_id}")
 def get_alert(
@@ -154,9 +154,9 @@ def get_alert(
     counterfactual = compute_counterfactual(db, student) if student else None
 
     # Calculate exact point contributions
-    att_contrib = round(alert.attendance_drift * 0.40, 1)
-    sub_contrib = round(alert.submission_drift * 0.35, 1)
-    eng_contrib = round(alert.engagement_drift * 0.25, 1)
+    att_contrib = round(alert.attendance_drift * W_ATTENDANCE, 1)
+    sub_contrib = round(alert.submission_drift * W_SUBMISSION, 1)
+    eng_contrib = round(alert.engagement_drift * W_ENGAGEMENT, 1)
 
     fb = db.query(FlagFeedback).filter(
         FlagFeedback.alert_id == alert_id
@@ -187,17 +187,17 @@ def get_alert(
         "components": {
             "attendance": {
                 "score": round(alert.attendance_drift, 1),
-                "weight": 0.40,
+                "weight": W_ATTENDANCE,
                 "contribution": att_contrib
             },
             "submission": {
                 "score": round(alert.submission_drift, 1),
-                "weight": 0.35,
+                "weight": W_SUBMISSION,
                 "contribution": sub_contrib
             },
             "engagement": {
                 "score": round(alert.engagement_drift, 1),
-                "weight": 0.25,
+                "weight": W_ENGAGEMENT,
                 "contribution": eng_contrib
             }
         },
@@ -265,7 +265,7 @@ def submit_alert_feedback(
     db.refresh(feedback_obj)
 
     return {
-        "succes": True,
+        "success": True,
         "message": "Faculty feedback recorded. System Trust metrics updated.",
         "feedback": {
             "id": feedback_obj.id,

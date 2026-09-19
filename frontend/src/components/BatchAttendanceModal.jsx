@@ -1,23 +1,99 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { X, CheckSquare, Users, Calendar, AlertCircle } from 'lucide-react'
 import { studentsAPI } from '../api/client'
 import toast from 'react-hot-toast'
 
-export default function BatchAttendanceModal({ isOpen, onClose, students = [], onAttendanceSubmitted }) {
-  if (!isOpen) return null
+// Module-level cache so reopening the modal persists the selected date and period
+let lastUsedDate = new Date().toISOString().slice(0, 10)
+let lastUsedPeriod = 1
 
-  const [dateStr, setDateStr] = useState(new Date().toISOString().slice(0, 10))
-  const [period, setPeriod] = useState(1)
-  const [statuses, setStatuses] = useState(() => {
-    const map = {}
-    students.forEach(s => { map[s.student_id] = 'present' })
-    return map
-  })
+export default function BatchAttendanceModal({ isOpen, onClose, students = [], onAttendanceSubmitted }) {
+  const [dateStr, setDateStr] = useState(lastUsedDate)
+  const [period, setPeriod] = useState(lastUsedPeriod)
+  const [rosterStudents, setRosterStudents] = useState(students)
+  const [statuses, setStatuses] = useState({})
+  const [loadingAttendance, setLoadingAttendance] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  // Sync date and period with last used when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setDateStr(lastUsedDate)
+      setPeriod(lastUsedPeriod)
+    }
+  }, [isOpen])
+
+  // Ensure batch register has complete student roster even if main list was filtered
+  useEffect(() => {
+    if (!isOpen) return
+    if (students && students.length >= 40) {
+      setRosterStudents(students)
+    } else {
+      studentsAPI.list({ status: 'all' })
+        .then(res => {
+          const list = res.data?.students || []
+          if (list.length > 0) {
+            setRosterStudents(list)
+          } else {
+            setRosterStudents(students)
+          }
+        })
+        .catch(() => setRosterStudents(students))
+    }
+  }, [isOpen, students])
+
+  // Fetch saved attendance records whenever modal opens or date/period/roster changes
+  useEffect(() => {
+    if (!isOpen || !dateStr) return
+
+    let cancelled = false
+    setLoadingAttendance(true)
+
+    studentsAPI.getBatchAttendance({
+      date: dateStr,
+      period: parseInt(period, 10)
+    })
+      .then(res => {
+        if (cancelled) return
+        const records = res.data?.records || {}
+        const map = {}
+        rosterStudents.forEach(s => {
+          map[s.student_id] = records[s.student_id] !== undefined ? records[s.student_id] : 'present'
+        })
+        setStatuses(map)
+      })
+      .catch(err => {
+        if (cancelled) return
+        console.error('Failed to load batch attendance:', err)
+        const map = {}
+        rosterStudents.forEach(s => {
+          map[s.student_id] = 'present'
+        })
+        setStatuses(map)
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAttendance(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, dateStr, period, rosterStudents])
+
+  const handleDateChange = (val) => {
+    setDateStr(val)
+    lastUsedDate = val
+  }
+
+  const handlePeriodChange = (val) => {
+    const p = parseInt(val, 10)
+    setPeriod(p)
+    lastUsedPeriod = p
+  }
 
   const handleSetAll = (status) => {
     const updated = {}
-    students.forEach(s => { updated[s.student_id] = status })
+    rosterStudents.forEach(s => { updated[s.student_id] = status })
     setStatuses(updated)
   }
 
@@ -38,6 +114,8 @@ export default function BatchAttendanceModal({ isOpen, onClose, students = [], o
         period: parseInt(period, 10),
         records
       })
+      lastUsedDate = dateStr
+      lastUsedPeriod = period
       toast.success(`Updated attendance for ${res.data.updated_count} students! ${res.data.alerts_triggered > 0 ? `(${res.data.alerts_triggered} new alerts triggered)` : ''}`)
       if (onAttendanceSubmitted) onAttendanceSubmitted()
       onClose()
@@ -47,6 +125,8 @@ export default function BatchAttendanceModal({ isOpen, onClose, students = [], o
       setSubmitting(false)
     }
   }
+
+  if (!isOpen) return null
 
   return (
     <div style={{
@@ -124,7 +204,7 @@ export default function BatchAttendanceModal({ isOpen, onClose, students = [], o
                 type="date"
                 className="input"
                 value={dateStr}
-                onChange={(e) => setDateStr(e.target.value)}
+                onChange={(e) => handleDateChange(e.target.value)}
                 style={{ padding: '6px 10px', fontSize: 12 }}
               />
             </div>
@@ -132,7 +212,7 @@ export default function BatchAttendanceModal({ isOpen, onClose, students = [], o
               <select
                 className="input"
                 value={period}
-                onChange={(e) => setPeriod(e.target.value)}
+                onChange={(e) => handlePeriodChange(e.target.value)}
                 style={{ padding: '6px 10px', fontSize: 12 }}
               >
                 {[1, 2, 3, 4, 5, 6].map(p => (
@@ -164,13 +244,13 @@ export default function BatchAttendanceModal({ isOpen, onClose, students = [], o
 
         {/* Student Table */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 20px' }}>
-          {students.length === 0 ? (
+          {rosterStudents.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 30, color: 'var(--text-muted)' }}>
               No students available in this cohort.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {students.map((s, idx) => {
+              {rosterStudents.map((s, idx) => {
                 const cur = statuses[s.student_id] || 'present'
                 return (
                   <div
@@ -243,11 +323,11 @@ export default function BatchAttendanceModal({ isOpen, onClose, students = [], o
           <button
             type="button"
             className="btn btn-primary btn-sm"
-            disabled={submitting || students.length === 0}
+            disabled={submitting || loadingAttendance || rosterStudents.length === 0}
             onClick={handleSubmit}
             style={{ minWidth: 140 }}
           >
-            {submitting ? 'Saving...' : `Save (${students.length} Records)`}
+            {submitting ? 'Saving...' : loadingAttendance ? 'Loading...' : `Save (${rosterStudents.length} Records)`}
           </button>
         </div>
       </div>

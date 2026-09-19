@@ -28,7 +28,7 @@ import json
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from database import SessionLocal, Student
-from dvi_engine import compute_dvi
+from dvi_engine import compute_dvi, W_ATTENDANCE, W_SUBMISSION, W_ENGAGEMENT
 
 ALERT_THRESHOLD = 70.0
 MONITORING_THRESHOLD = 50.0
@@ -47,7 +47,7 @@ ARCHETYPE_LABELS = {
     "excused":        "negative",    # Approved leave — should not be flagged
 }
 
-CURRENT_WEIGHTS = {"attendance": 0.40, "submission": 0.35, "engagement": 0.25}
+CURRENT_WEIGHTS = {"attendance": W_ATTENDANCE, "submission": W_SUBMISSION, "engagement": W_ENGAGEMENT}
 
 
 def run_model_validation() -> dict:

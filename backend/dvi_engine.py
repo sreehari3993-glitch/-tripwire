@@ -3,7 +3,7 @@ Tripwire DVI Engine
 -------------------
 Computes the Disengagement Velocity Index (DVI) for each student.
 
-DVI = (Attendance Drift × 0.40) + (Submission Drift × 0.35) + (Engagement Drift × 0.25)
+DVI = (Attendance Drift × 0.50) + (Submission Drift × 0.30) + (Engagement Drift × 0.20)
 
 Each component is normalized 0–100.
 """
@@ -18,13 +18,14 @@ from database import Student, Attendance, Assignment, LMSActivity, LeaveRecord
 # ──────────────────────────────────────────────
 # Weights & Thresholds
 # ──────────────────────────────────────────────
-W_ATTENDANCE  = 0.40
-W_SUBMISSION  = 0.35
-W_ENGAGEMENT  = 0.25
+W_ATTENDANCE  = 0.50
+W_SUBMISSION  = 0.30
+W_ENGAGEMENT  = 0.20
 
 # Prototype Thresholds (Clearly labeled as decision-support indicators)
 THRESHOLD_TRIPWIRE  = 70.0
 THRESHOLD_MONITOR   = 50.0
+THRESHOLD_WATCH     = 35.0
 
 # Hysteresis Asymmetric Recovery Thresholds (Anti-Flapping Mechanism)
 # Once a student enters TRIPWIRE, they must sustain DVI < 55 for 2 weeks to enter RECOVERING.
@@ -354,14 +355,20 @@ def compute_dvi(
             status = "recovering"
         elif dvi >= THRESHOLD_TRIPWIRE:
             status = "tripwire"
-        else:
+        elif dvi >= THRESHOLD_MONITOR:
             status = "monitoring"
+        elif dvi >= THRESHOLD_WATCH:
+            status = "watch"
+        else:
+            status = "normal"
     else:
         # Pre-intervention pathway
         if dvi >= THRESHOLD_TRIPWIRE:
             status = "tripwire"
         elif dvi >= THRESHOLD_MONITOR:
             status = "monitoring"
+        elif dvi >= THRESHOLD_WATCH:
+            status = "watch"
         else:
             status = "normal"
 
@@ -393,6 +400,8 @@ def compute_dvi(
         },
         "hysteresis": {
             "tripwire_threshold": THRESHOLD_TRIPWIRE,
+            "monitor_threshold": THRESHOLD_MONITOR,
+            "watch_threshold": THRESHOLD_WATCH,
             "recovery_threshold": THRESHOLD_HYSTERESIS_RECOVERY,
             "normal_threshold": THRESHOLD_HYSTERESIS_NORMAL,
             "weeks_sustained": weeks_in_status,
@@ -474,25 +483,29 @@ def compute_counterfactual(
                 "hypothetical_dvi": cf_sub_dvi,
                 "delta": round(cf_sub_dvi - current_dvi, 1),
                 "clears_tripwire": cf_sub_dvi < THRESHOLD_TRIPWIRE,
-                "clears_monitoring": cf_sub_dvi < THRESHOLD_MONITOR
+                "clears_monitoring": cf_sub_dvi < THRESHOLD_MONITOR,
+                "clears_watch": cf_sub_dvi < THRESHOLD_WATCH
             },
             "if_lms_baseline": {
                 "hypothetical_dvi": cf_lms_dvi,
                 "delta": round(cf_lms_dvi - current_dvi, 1),
                 "clears_tripwire": cf_lms_dvi < THRESHOLD_TRIPWIRE,
-                "clears_monitoring": cf_lms_dvi < THRESHOLD_MONITOR
+                "clears_monitoring": cf_lms_dvi < THRESHOLD_MONITOR,
+                "clears_watch": cf_lms_dvi < THRESHOLD_WATCH
             },
             "if_attendance_baseline": {
                 "hypothetical_dvi": cf_att_dvi,
                 "delta": round(cf_att_dvi - current_dvi, 1),
                 "clears_tripwire": cf_att_dvi < THRESHOLD_TRIPWIRE,
-                "clears_monitoring": cf_att_dvi < THRESHOLD_MONITOR
+                "clears_monitoring": cf_att_dvi < THRESHOLD_MONITOR,
+                "clears_watch": cf_att_dvi < THRESHOLD_WATCH
             },
             "if_submission_and_lms_baseline": {
                 "hypothetical_dvi": cf_sub_lms_dvi,
                 "delta": round(cf_sub_lms_dvi - current_dvi, 1),
                 "clears_tripwire": cf_sub_lms_dvi < THRESHOLD_TRIPWIRE,
-                "clears_monitoring": cf_sub_lms_dvi < THRESHOLD_MONITOR
+                "clears_monitoring": cf_sub_lms_dvi < THRESHOLD_MONITOR,
+                "clears_watch": cf_sub_lms_dvi < THRESHOLD_WATCH
             }
         },
         "summary": summary,

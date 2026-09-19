@@ -14,6 +14,7 @@ def get_summary(db: Session = Depends(get_db), mentor=Depends(get_current_mentor
     students = db.query(Student).filter(Student.mentor_id == mentor.mentor_id).all()
 
     normal_count     = 0
+    watch_count      = 0
     monitoring_count = 0
     tripwire_count   = 0
     recovering_count = 0
@@ -48,6 +49,8 @@ def get_summary(db: Session = Depends(get_db), mentor=Depends(get_current_mentor
             recovering_count += 1
         elif s == "monitoring":
             monitoring_count += 1
+        elif s == "watch":
+            watch_count += 1
         else:
             normal_count += 1
 
@@ -85,6 +88,7 @@ def get_summary(db: Session = Depends(get_db), mentor=Depends(get_current_mentor
     return {
         "total_students": len(students),
         "normal": normal_count,
+        "watch": watch_count,
         "monitoring": monitoring_count,
         "tripwire": tripwire_count,
         "recovering": recovering_count,
@@ -94,6 +98,7 @@ def get_summary(db: Session = Depends(get_db), mentor=Depends(get_current_mentor
         "prototype_thresholds": {
             "tripwire": 70,
             "monitoring": 50,
+            "watch": 35,
             "normal": 0,
             "disclaimer": "Prototype threshold — decision-support indicator, not a diagnostic verdict."
         }

@@ -46,3 +46,5 @@ backend/.env
 frontend - Copy/
 *.zip
 tripwire.db
+*.db-journal
+chrome_profile/

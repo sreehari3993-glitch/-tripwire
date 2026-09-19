@@ -52,6 +52,7 @@ class TestDVIEngine(unittest.TestCase):
         """Verify standard prototype thresholds."""
         self.assertEqual(dvi_engine.THRESHOLD_TRIPWIRE, 70.0)
         self.assertEqual(dvi_engine.THRESHOLD_MONITOR, 50.0)
+        self.assertEqual(dvi_engine.THRESHOLD_WATCH, 35.0)
         self.assertEqual(dvi_engine.THRESHOLD_HYSTERESIS_RECOVERY, 55.0)
         self.assertEqual(dvi_engine.THRESHOLD_HYSTERESIS_NORMAL, 40.0)
 
