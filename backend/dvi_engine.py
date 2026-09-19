@@ -3,7 +3,7 @@ Tripwire DVI Engine
 -------------------
 Computes the Disengagement Velocity Index (DVI) for each student.
 
-DVI = (Attendance Drift × 0.50) + (Submission Drift × 0.30) + (Engagement Drift × 0.20)
+DVI = (Series Exam Mark Drift × 0.30) + (Attendance Drift × 0.30) + (Submission Drift × 0.30) + (Engagement Drift × 0.10)
 
 Each component is normalized 0–100.
 """
@@ -18,14 +18,21 @@ from database import Student, Attendance, Assignment, LMSActivity, LeaveRecord
 # ──────────────────────────────────────────────
 # Weights & Thresholds
 # ──────────────────────────────────────────────
-W_ATTENDANCE  = 0.50
+W_SERIES_EXAM = 0.30
+W_ATTENDANCE  = 0.30
 W_SUBMISSION  = 0.30
-W_ENGAGEMENT  = 0.20
+W_ENGAGEMENT  = 0.10
 
 # Prototype Thresholds (Clearly labeled as decision-support indicators)
 THRESHOLD_TRIPWIRE  = 70.0
 THRESHOLD_MONITOR   = 50.0
 THRESHOLD_WATCH     = 35.0
+
+# Series Exam & Academic Criteria Thresholds
+THRESHOLD_SERIES_EXAM     = 45.0   # Statutory Series Exam passing / qualifying cutoff (45.0%)
+THRESHOLD_EXAM_PASS_MARK  = 40.0   # Statutory CIE / Semester Exam passing cutoff (40.0%)
+THRESHOLD_EXAM_ATTENDANCE = 75.0   # University statutory attendance cutoff (75.0%)
+THRESHOLD_EXAM_RISK_DVI   = 50.0   # DVI score threshold where semester exam risk escalates
 
 # Hysteresis Asymmetric Recovery Thresholds (Anti-Flapping Mechanism)
 # Once a student enters TRIPWIRE, they must sustain DVI < 55 for 2 weeks to enter RECOVERING.
@@ -42,7 +49,8 @@ COHORT_MEDIANS = {
     "attendance": 92.0,
     "submission_delay_hrs": 5.5,
     "lms_per_week": 8.0,
-    "morning_absences": 0.2
+    "morning_absences": 0.2,
+    "series_exam_mark": 75.0
 }
 
 
@@ -62,10 +70,12 @@ def get_effective_baselines(student: Student) -> dict:
     base_att = getattr(student, "baseline_attendance", 90.0) or 90.0
     base_sub = getattr(student, "baseline_submission_delay_hrs", 5.0) or 5.0
     base_lms = getattr(student, "baseline_lms_activity_per_week", 8.0) or 8.0
+    base_exam = getattr(student, "baseline_series_exam_mark", 75.0) or 75.0
 
     eff_att = ind_weight * base_att + (1.0 - ind_weight) * COHORT_MEDIANS["attendance"]
     eff_sub = ind_weight * base_sub + (1.0 - ind_weight) * COHORT_MEDIANS["submission_delay_hrs"]
     eff_lms = ind_weight * base_lms + (1.0 - ind_weight) * COHORT_MEDIANS["lms_per_week"]
+    eff_exam = ind_weight * base_exam + (1.0 - ind_weight) * COHORT_MEDIANS["series_exam_mark"]
 
     confidence = "Established" if ind_weight >= 1.0 else f"Building ({int(ind_weight * 100)}% calibrated)"
 
@@ -73,6 +83,7 @@ def get_effective_baselines(student: Student) -> dict:
         "attendance": round(eff_att, 1),
         "submission_delay_hrs": round(eff_sub, 1),
         "lms_per_week": round(eff_lms, 1),
+        "series_exam_mark": round(eff_exam, 1),
         "individual_weight": round(ind_weight, 2),
         "weeks_of_data": round(weeks, 1),
         "confidence": confidence,
@@ -263,6 +274,141 @@ def compute_morning_absences(
     }
 
 
+def compute_series_exam_drift(student: Student, effective_baseline: Optional[float] = None) -> dict:
+    """
+    Computes drift in Series Exam performance (Internal Assessment / Sessional Tests):
+    Compares student's current series exam mark vs. baseline.
+    Threshold: THRESHOLD_SERIES_EXAM = 45.0%
+    If mark falls below 45%, student breaches series exam qualification cutoff.
+    Drift score is normalized 0-100.
+    """
+    if isinstance(effective_baseline, dict):
+        base_mark = effective_baseline.get("series_exam", effective_baseline.get("series_exam_mark", 75.0))
+    elif effective_baseline is not None:
+        base_mark = effective_baseline
+    else:
+        base_mark = getattr(student, "baseline_series_exam_mark", 75.0) or 75.0
+
+    # Check for direct series_exam_mark attribute, or fallback based on archetype
+    curr_mark = getattr(student, "series_exam_mark", None)
+    if curr_mark is None:
+        archetype = getattr(student, "archetype", "normal") or "normal"
+        if archetype == "rapid_decline":
+            curr_mark = 34.0
+        elif archetype == "monitoring":
+            curr_mark = 48.0
+        elif archetype == "slow_decline":
+            curr_mark = 54.0
+        elif archetype == "recovery":
+            curr_mark = 64.0
+        elif archetype == "improver":
+            curr_mark = 74.0
+        elif archetype == "excused":
+            curr_mark = 72.0
+        else:
+            curr_mark = 80.0
+
+    curr_mark = round(float(curr_mark), 1)
+    base_mark = round(float(base_mark), 1)
+
+    if base_mark <= 0:
+        score = 0.0
+    else:
+        rel_drop = max(0.0, (base_mark - curr_mark) / base_mark)
+        # Scaled so dropping below 45% threshold from 75% baseline maps to >= 70 score
+        score = min(rel_drop * 160.0, 100.0)
+
+    shortfall = max(0.0, round(THRESHOLD_SERIES_EXAM - curr_mark, 1))
+    is_below = curr_mark < THRESHOLD_SERIES_EXAM
+
+    return {
+        "score": round(score, 1),
+        "current_mark": curr_mark,
+        "baseline_mark": base_mark,
+        "delta_mark": round(curr_mark - base_mark, 1),
+        "threshold": THRESHOLD_SERIES_EXAM,
+        "shortfall": shortfall,
+        "is_below_threshold": is_below,
+        "below_threshold": is_below,
+        "status": "FAIL_RISK" if is_below else "PASSING"
+    }
+
+
+def compute_exam_eligibility(
+    dvi: float, current_att: float,
+    baseline_att: float = 85.0,
+    series_mark: Optional[float] = None
+) -> dict:
+    """
+    Evaluates semester exam eligibility, series exam qualification, and projected continuous internal evaluation (CIE) marks:
+    1. Series Exam Qualification Threshold: >= 45.0%
+    2. Statutory University Attendance Cutoff (KTU/ERP standard): >= 75.0%
+    3. Semester Exam / CIE Minimum Pass Mark Cutoff: >= 40.0%
+    4. DVI Risk Check (>= 50: High Risk, >= 70: Critical Tripwire)
+    """
+    # Baseline expected mark benchmarks ~ 80% (First Class), decremented by DVI behavioral velocity
+    projected_mark = round(max(0.0, min(100.0, 80.0 - (dvi * 0.55))), 1)
+
+    att_shortfall = max(0.0, round(THRESHOLD_EXAM_ATTENDANCE - current_att, 1))
+    mark_shortfall = max(0.0, round(THRESHOLD_EXAM_PASS_MARK - projected_mark, 1))
+
+    is_series_eligible = (series_mark >= THRESHOLD_SERIES_EXAM) if series_mark is not None else True
+    series_shortfall = max(0.0, round(THRESHOLD_SERIES_EXAM - series_mark, 1)) if series_mark is not None else 0.0
+
+    is_att_eligible = current_att >= THRESHOLD_EXAM_ATTENDANCE
+    is_marks_eligible = projected_mark >= THRESHOLD_EXAM_PASS_MARK
+    is_fully_eligible = is_att_eligible and is_marks_eligible and is_series_eligible and dvi < THRESHOLD_TRIPWIRE
+
+    if not is_att_eligible and not is_marks_eligible:
+        status = "critical_dual_risk"
+        label = "Critical Dual Risk: Exam Debarment & Mark Fail"
+        risk_level = "critical"
+    elif not is_att_eligible:
+        status = "attendance_debarment_risk"
+        label = f"Exam Debarment Risk ({current_att:.1f}% < 75% attendance threshold)"
+        risk_level = "high"
+    elif not is_series_eligible:
+        status = "series_fail_risk"
+        label = f"Series Exam Fail Risk ({series_mark:.1f}% < 45% cutoff)"
+        risk_level = "high"
+    elif not is_marks_eligible:
+        status = "academic_fail_risk"
+        label = f"Projected Mark Failure ({projected_mark:.1f}% < 40% pass mark)"
+        risk_level = "high"
+    elif dvi >= THRESHOLD_EXAM_RISK_DVI:
+        status = "exam_monitoring"
+        label = f"Exam Monitoring: CIE Risk (DVI {dvi:.1f} >= 50)"
+        risk_level = "moderate"
+    elif dvi >= THRESHOLD_WATCH:
+        status = "exam_watch"
+        label = f"Academic Watch (DVI {dvi:.1f} >= 35)"
+        risk_level = "low"
+    else:
+        status = "exam_eligible"
+        label = "Eligible for Semester Exam & Passing"
+        risk_level = "safe"
+
+    return {
+        "series_exam_threshold": THRESHOLD_SERIES_EXAM,
+        "series_exam_mark": series_mark,
+        "series_exam_shortfall": series_shortfall,
+        "is_series_exam_eligible": is_series_eligible,
+        "min_attendance_threshold": THRESHOLD_EXAM_ATTENDANCE,
+        "min_pass_mark_threshold": THRESHOLD_EXAM_PASS_MARK,
+        "exam_risk_dvi_threshold": THRESHOLD_EXAM_RISK_DVI,
+        "current_attendance": round(current_att, 1),
+        "attendance_shortfall": att_shortfall,
+        "is_attendance_eligible": is_att_eligible,
+        "projected_exam_mark": projected_mark,
+        "mark_shortfall": mark_shortfall,
+        "is_marks_eligible": is_marks_eligible,
+        "is_eligible": is_fully_eligible,
+        "status": status,
+        "label": label,
+        "risk_level": risk_level
+    }
+
+
 def compute_dvi(
     db: Session, student: Student,
     ref_date: Optional[date] = None,
@@ -271,56 +417,61 @@ def compute_dvi(
 ) -> dict:
     """
     Full DVI computation for a student.
+    DVI = 0.30(Series Exam Drift) + 0.30(Attendance Drift) + 0.30(Submission Drift) + 0.10(Engagement Drift)
     Returns complete breakdown with component scores, raw vs EWMA smoothed scores,
     cold-start baseline confidence, and hysteresis recovery state.
     """
     from database import TripwireAlert, Intervention
 
-    w_att = weights.get("attendance", W_ATTENDANCE) if weights else W_ATTENDANCE
-    w_sub = weights.get("submission", W_SUBMISSION) if weights else W_SUBMISSION
-    w_eng = weights.get("engagement", W_ENGAGEMENT) if weights else W_ENGAGEMENT
+    w_exam = weights.get("series_exam", W_SERIES_EXAM) if weights else W_SERIES_EXAM
+    w_att  = weights.get("attendance", W_ATTENDANCE) if weights else W_ATTENDANCE
+    w_sub  = weights.get("submission", W_SUBMISSION) if weights else W_SUBMISSION
+    w_eng  = weights.get("engagement", W_ENGAGEMENT) if weights else W_ENGAGEMENT
 
+    exam  = compute_series_exam_drift(student)
     att   = compute_attendance_drift(db, student, window_days=14, ref_date=ref_date)
     sub   = compute_submission_drift(db, student, last_n=5)
     eng   = compute_engagement_drift(db, student, window_days=7, ref_date=ref_date)
     morn  = compute_morning_absences(db, student, window_days=14, ref_date=ref_date)
 
-    raw_att = att["score"]
-    raw_sub = sub["score"]
-    raw_eng = eng["score"]
+    raw_exam = exam["score"]
+    raw_att  = att["score"]
+    raw_sub  = sub["score"]
+    raw_eng  = eng["score"]
 
-    raw_dvi = round(raw_att * w_att + raw_sub * w_sub + raw_eng * w_eng, 1)
+    raw_dvi = round(raw_exam * w_exam + raw_att * w_att + raw_sub * w_sub + raw_eng * w_eng, 1)
     raw_dvi = min(raw_dvi, 100.0)
 
     # ── TEMPORAL SMOOTHING (EWMA) ──────────────────────────────────────────
-    # S_t = alpha * X_t + (1 - alpha) * S_{t-1}
-    # For sustained multi-week decline (Rahul, rapid_decline), prior drift is already high.
-    # For isolated 1-off bad weeks (flu, exam), prior drift is near 0, preventing false alerts.
     prev_alert = db.query(TripwireAlert).filter(
         TripwireAlert.student_id == student.student_id
     ).order_by(TripwireAlert.trigger_date.desc()).first()
 
     if prev_alert and prev_alert.attendance_drift > 0:
-        prior_att = prev_alert.raw_attendance_drift or prev_alert.attendance_drift
-        prior_sub = prev_alert.raw_submission_drift or prev_alert.submission_drift
-        prior_eng = prev_alert.raw_engagement_drift or prev_alert.engagement_drift
+        prior_exam = getattr(prev_alert, "raw_series_exam_drift", getattr(prev_alert, "series_exam_drift", 0.0)) or raw_exam
+        prior_att  = prev_alert.raw_attendance_drift or prev_alert.attendance_drift
+        prior_sub  = prev_alert.raw_submission_drift or prev_alert.submission_drift
+        prior_eng  = prev_alert.raw_engagement_drift or prev_alert.engagement_drift
     else:
         # Default baseline prior is 0 for normal, or current raw if sustained archetype
         archetype = getattr(student, "archetype", "") or ""
         if archetype in ["rapid_decline", "recovery"]:
-            prior_att = raw_att
-            prior_sub = raw_sub
-            prior_eng = raw_eng
+            prior_exam = raw_exam
+            prior_att  = raw_att
+            prior_sub  = raw_sub
+            prior_eng  = raw_eng
         else:
-            prior_att = 0.0
-            prior_sub = 0.0
-            prior_eng = 0.0
+            prior_exam = 0.0
+            prior_att  = 0.0
+            prior_sub  = 0.0
+            prior_eng  = 0.0
 
-    smoothed_att = round(alpha * raw_att + (1.0 - alpha) * prior_att, 1)
-    smoothed_sub = round(alpha * raw_sub + (1.0 - alpha) * prior_sub, 1)
-    smoothed_eng = round(alpha * raw_eng + (1.0 - alpha) * prior_eng, 1)
+    smoothed_exam = round(alpha * raw_exam + (1.0 - alpha) * prior_exam, 1)
+    smoothed_att  = round(alpha * raw_att + (1.0 - alpha) * prior_att, 1)
+    smoothed_sub  = round(alpha * raw_sub + (1.0 - alpha) * prior_sub, 1)
+    smoothed_eng  = round(alpha * raw_eng + (1.0 - alpha) * prior_eng, 1)
 
-    smoothed_dvi = round(smoothed_att * w_att + smoothed_sub * w_sub + smoothed_eng * w_eng, 1)
+    smoothed_dvi = round(smoothed_exam * w_exam + smoothed_att * w_att + smoothed_sub * w_sub + smoothed_eng * w_eng, 1)
     smoothed_dvi = min(smoothed_dvi, 100.0)
 
     # Primary detection DVI uses smoothed score
@@ -331,20 +482,6 @@ def compute_dvi(
         TripwireAlert.student_id == student.student_id
     ).order_by(Intervention.contact_date.desc()).first()
 
-
-    # ──────────────────────────────────────────────────────────────────────────
-    # HYSTERESIS RECOVERY ENGINE:
-    # Alert Trigger Threshold: DVI >= 70.0  -> TRIPWIRE
-    # Monitoring Threshold:    DVI >= 50.0  -> MONITORING
-    #
-    # ASYMMETRIC RECOVERY RULES:
-    # 1. Once a student enters TRIPWIRE status, they cannot immediately flip back
-    #    to Normal or Monitoring with a single improved data point (avoids flapping).
-    # 2. To transition from TRIPWIRE -> RECOVERING:
-    #    Student must sustain DVI < 55.0 for 2 consecutive evaluations/weeks.
-    # 3. To transition from RECOVERING -> NORMAL:
-    #    Student must sustain DVI < 40.0 for 2 consecutive evaluations/weeks.
-    # ──────────────────────────────────────────────────────────────────────────
     weeks_in_status = getattr(student, "weeks_in_status", 1) or 1
 
     if latest_inv:
@@ -374,8 +511,16 @@ def compute_dvi(
 
     velocity_label = _velocity_label(dvi)
     baseline_info  = get_effective_baselines(student)
+    exam_elig      = compute_exam_eligibility(
+        dvi,
+        att["current_pct"],
+        getattr(student, "baseline_attendance", 85.0) or 85.0,
+        series_mark=exam["current_mark"]
+    )
 
     # Expose both raw and smoothed component values
+    exam["raw_score"] = raw_exam
+    exam["smoothed_score"] = smoothed_exam
     att["raw_score"] = raw_att
     att["smoothed_score"] = smoothed_att
     sub["raw_score"] = raw_sub
@@ -392,6 +537,7 @@ def compute_dvi(
         "weeks_in_status": weeks_in_status,
         "baseline_confidence": baseline_info["confidence"],
         "is_cold_start": baseline_info["is_cold_start"],
+        "exam_eligibility": exam_elig,
         "smoothing": {
             "method": "EWMA",
             "alpha": alpha,
@@ -407,13 +553,21 @@ def compute_dvi(
             "weeks_sustained": weeks_in_status,
             "weeks_required": HYSTERESIS_WEEKS_REQUIRED
         },
+        "academic_thresholds": {
+            "series_exam": THRESHOLD_SERIES_EXAM,
+            "statutory_attendance": THRESHOLD_EXAM_ATTENDANCE,
+            "pass_mark": THRESHOLD_EXAM_PASS_MARK,
+            "risk_dvi": THRESHOLD_EXAM_RISK_DVI
+        },
         "components": {
+            "series_exam": exam,
             "attendance": att,
             "submission": sub,
             "engagement": eng,
             "morning_absences": morn
         },
         "weights": {
+            "series_exam": w_exam,
             "attendance": w_att,
             "submission": w_sub,
             "engagement": w_eng
@@ -434,23 +588,27 @@ def compute_counterfactual(
     current_dvi = dvi_data["dvi"]
     comps = dvi_data["components"]
 
-    att_score = comps["attendance"]["score"]
-    sub_score = comps["submission"]["score"]
-    eng_score = comps["engagement"]["score"]
+    att_score  = comps["attendance"]["score"]
+    sub_score  = comps["submission"]["score"]
+    eng_score  = comps["engagement"]["score"]
+    exam_score = comps.get("series_exam", {}).get("score", 0.0)
 
-    att_contrib = att_score * W_ATTENDANCE
-    sub_contrib = sub_score * W_SUBMISSION
-    eng_contrib = eng_score * W_ENGAGEMENT
+    exam_contrib = exam_score * W_SERIES_EXAM
+    att_contrib  = att_score * W_ATTENDANCE
+    sub_contrib  = sub_score * W_SUBMISSION
+    eng_contrib  = eng_score * W_ENGAGEMENT
 
-    cf_sub_dvi = round(max(0.0, current_dvi - sub_contrib), 1)
-    cf_lms_dvi = round(max(0.0, current_dvi - eng_contrib), 1)
-    cf_att_dvi = round(max(0.0, current_dvi - att_contrib), 1)
+    cf_exam_dvi = round(max(0.0, current_dvi - exam_contrib), 1)
+    cf_sub_dvi  = round(max(0.0, current_dvi - sub_contrib), 1)
+    cf_lms_dvi  = round(max(0.0, current_dvi - eng_contrib), 1)
+    cf_att_dvi  = round(max(0.0, current_dvi - att_contrib), 1)
     cf_sub_lms_dvi = round(max(0.0, current_dvi - sub_contrib - eng_contrib), 1)
 
     ranked_contributors = sorted([
+        ("series exam marks", exam_contrib, exam_score),
         ("submission latency", sub_contrib, sub_score),
-        ("LMS activity", eng_contrib, eng_score),
-        ("attendance", att_contrib, att_score)
+        ("attendance", att_contrib, att_score),
+        ("LMS activity", eng_contrib, eng_score)
     ], key=lambda x: x[1], reverse=True)
 
     significant = [name for name, contrib, score in ranked_contributors if score > 25]
@@ -471,7 +629,7 @@ def compute_counterfactual(
             )
     else:
         summary = (
-            f"Restoring {significant[0]} to normal baseline would reduce DVI by {max(att_contrib, sub_contrib, eng_contrib):.1f} points."
+            f"Restoring {significant[0]} to normal baseline would reduce DVI by {max(exam_contrib, att_contrib, sub_contrib, eng_contrib):.1f} points."
         )
 
     return {
@@ -479,6 +637,13 @@ def compute_counterfactual(
         "current_dvi": current_dvi,
         "threshold": THRESHOLD_TRIPWIRE,
         "scenarios": {
+            "if_series_exam_baseline": {
+                "hypothetical_dvi": cf_exam_dvi,
+                "delta": round(cf_exam_dvi - current_dvi, 1),
+                "clears_tripwire": cf_exam_dvi < THRESHOLD_TRIPWIRE,
+                "clears_monitoring": cf_exam_dvi < THRESHOLD_MONITOR,
+                "clears_watch": cf_exam_dvi < THRESHOLD_WATCH
+            },
             "if_submission_baseline": {
                 "hypothetical_dvi": cf_sub_dvi,
                 "delta": round(cf_sub_dvi - current_dvi, 1),

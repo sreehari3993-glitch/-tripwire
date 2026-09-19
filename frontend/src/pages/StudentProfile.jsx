@@ -10,7 +10,8 @@ import LogTelemetryModal from '../components/LogTelemetryModal'
 import {
   ArrowLeft, AlertTriangle, TrendingDown, TrendingUp, Clock,
   BookOpen, Sunrise, Activity, Shield, ShieldCheck, HelpCircle,
-  CheckCircle2, Plus, Calendar, UserCheck, AlertCircle, Zap, RotateCcw
+  CheckCircle2, Plus, Calendar, UserCheck, AlertCircle, Zap, RotateCcw,
+  GraduationCap
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -506,9 +507,36 @@ export default function StudentProfile() {
             </span>
           </div>
 
-          {/* 3 Metric Comparison Cards */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 20 }}>
-            {/* Card 1: Attendance */}
+          {/* 4 Metric Comparison Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 20 }}>
+            {/* Card 1: Series Exam Mark */}
+            <div style={{
+              background: 'var(--bg-elevated)',
+              border: '1px solid rgba(236, 72, 153, 0.25)',
+              borderRadius: 12,
+              padding: '16px 18px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Series Exam Mark (30%)</span>
+                <span style={{
+                  fontSize: 12, fontWeight: 800, fontFamily: 'var(--font-mono)',
+                  color: what_changed?.series_exam?.negative ? '#ef4444' : '#10b981'
+                }}>
+                  {what_changed?.series_exam?.formatted_change || '0.0%'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+                <div style={{ fontSize: 26, fontWeight: 800, fontFamily: 'var(--font-mono)', color: what_changed?.series_exam?.negative ? '#ef4444' : '#f8fafc' }}>
+                  {what_changed?.series_exam?.current ?? signals?.series_exam?.current_mark ?? 70}%
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>current score</div>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Baseline: <strong style={{ color: 'var(--text-secondary)' }}>{what_changed?.series_exam?.baseline ?? 75}%</strong> · Cutoff: <strong style={{ color: '#ec4899' }}>45%</strong>
+              </div>
+            </div>
+
+            {/* Card 2: Attendance */}
             <div style={{
               background: 'var(--bg-elevated)',
               border: '1px solid rgba(99,102,241,0.2)',
@@ -516,7 +544,7 @@ export default function StudentProfile() {
               padding: '16px 18px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Attendance Rate</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Attendance Rate (30%)</span>
                 <span style={{
                   fontSize: 12, fontWeight: 800, fontFamily: 'var(--font-mono)',
                   color: what_changed?.attendance?.negative ? '#ef4444' : '#10b981'
@@ -535,7 +563,7 @@ export default function StudentProfile() {
               </div>
             </div>
 
-            {/* Card 2: Assignment Delay */}
+            {/* Card 3: Assignment Delay */}
             <div style={{
               background: 'var(--bg-elevated)',
               border: '1px solid rgba(245,158,11,0.2)',
@@ -543,7 +571,7 @@ export default function StudentProfile() {
               padding: '16px 18px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Assignment Submission Latency</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Assignment Delay (30%)</span>
                 <span style={{
                   fontSize: 12, fontWeight: 800, fontFamily: 'var(--font-mono)',
                   color: what_changed?.submission_delay?.negative ? '#ef4444' : '#10b981'
@@ -562,7 +590,7 @@ export default function StudentProfile() {
               </div>
             </div>
 
-            {/* Card 3: LMS Activity */}
+            {/* Card 4: LMS Activity */}
             <div style={{
               background: 'var(--bg-elevated)',
               border: '1px solid rgba(6,182,212,0.2)',
@@ -570,7 +598,7 @@ export default function StudentProfile() {
               padding: '16px 18px'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>LMS / Course Engagement</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>LMS Engagement (10%)</span>
                 <span style={{
                   fontSize: 12, fontWeight: 800, fontFamily: 'var(--font-mono)',
                   color: what_changed?.lms_activity?.negative ? '#ef4444' : '#10b981'
@@ -612,6 +640,16 @@ export default function StudentProfile() {
 
               {/* Counterfactual chips */}
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {counterfactual.scenarios?.if_series_exam_baseline && (
+                  <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '8px 12px', fontSize: 11, border: '1px solid var(--border-subtle)' }}>
+                    <span style={{ color: 'var(--text-muted)' }}>If Series Exam was at baseline:</span>{' '}
+                    <strong style={{ color: counterfactual.scenarios.if_series_exam_baseline.clears_tripwire ? '#10b981' : '#f59e0b', fontFamily: 'var(--font-mono)' }}>
+                      DVI &rarr; {counterfactual.scenarios.if_series_exam_baseline.hypothetical_dvi}
+                    </strong>{' '}
+                    ({counterfactual.scenarios.if_series_exam_baseline.clears_tripwire ? 'Clears Tripwire' : 'Leaves in Monitoring'})
+                  </div>
+                )}
+
                 <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '8px 12px', fontSize: 11, border: '1px solid var(--border-subtle)' }}>
                   <span style={{ color: 'var(--text-muted)' }}>If Submission was at baseline:</span>{' '}
                   <strong style={{ color: counterfactual.scenarios.if_submission_baseline.clears_tripwire ? '#10b981' : '#f59e0b', fontFamily: 'var(--font-mono)' }}>
@@ -646,13 +684,22 @@ export default function StudentProfile() {
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 12 }}>
               DVI Additive Point Composition
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
               <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border-subtle)' }}>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
-                  Attendance Drift ({Math.round((profile?.weights?.attendance ?? 0.50) * 100)}%)
+                  Series Exam Mark ({Math.round((profile?.weights?.series_exam ?? 0.30) * 100)}%)
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#ec4899', fontFamily: 'var(--font-mono)' }}>
+                  {signals?.series_exam?.score ?? 0} pts &times; {(profile?.weights?.series_exam ?? 0.30).toFixed(2)} = {profile.dvi_breakdown?.series_exam_component ?? 0}
+                </div>
+              </div>
+
+              <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
+                  Attendance Drift ({Math.round((profile?.weights?.attendance ?? 0.30) * 100)}%)
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#6366f1', fontFamily: 'var(--font-mono)' }}>
-                  {signals.attendance.score} pts &times; {(profile?.weights?.attendance ?? 0.50).toFixed(2)} = {profile.dvi_breakdown?.attendance_component}
+                  {signals.attendance.score} pts &times; {(profile?.weights?.attendance ?? 0.30).toFixed(2)} = {profile.dvi_breakdown?.attendance_component}
                 </div>
               </div>
 
@@ -667,12 +714,162 @@ export default function StudentProfile() {
 
               <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '10px 12px', border: '1px solid var(--border-subtle)' }}>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
-                  Engagement Drop ({Math.round((profile?.weights?.engagement ?? 0.20) * 100)}%)
+                  Engagement Drop ({Math.round((profile?.weights?.engagement ?? 0.10) * 100)}%)
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#06b6d4', fontFamily: 'var(--font-mono)' }}>
-                  {signals.engagement.score} pts &times; {(profile?.weights?.engagement ?? 0.20).toFixed(2)} = {profile.dvi_breakdown?.engagement_component}
+                  {signals.engagement.score} pts &times; {(profile?.weights?.engagement ?? 0.10).toFixed(2)} = {profile.dvi_breakdown?.engagement_component}
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* 🎓 SEMESTER EXAM ELIGIBILITY & CIE MARKS THRESHOLD CHECK 🎓 */}
+          <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 16, marginTop: 16 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <GraduationCap size={16} color="var(--brand-glow)" />
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Semester Exam Eligibility &amp; Marks Risk (Threshold Evaluation)
+                </span>
+              </div>
+              <span style={{
+                fontSize: 11,
+                fontWeight: 700,
+                padding: '3px 10px',
+                borderRadius: 6,
+                background: (profile?.exam_eligibility?.is_eligible ?? (profile.dvi < 70 && signals.attendance.current_pct >= 75))
+                  ? 'rgba(16, 185, 129, 0.15)'
+                  : 'rgba(239, 68, 68, 0.15)',
+                color: (profile?.exam_eligibility?.is_eligible ?? (profile.dvi < 70 && signals.attendance.current_pct >= 75))
+                  ? '#10b981'
+                  : '#ef4444',
+                border: '1px solid ' + ((profile?.exam_eligibility?.is_eligible ?? (profile.dvi < 70 && signals.attendance.current_pct >= 75))
+                  ? 'rgba(16, 185, 129, 0.3)'
+                  : 'rgba(239, 68, 68, 0.3)')
+              }}>
+                {profile?.exam_eligibility?.label || (profile.dvi >= 70 ? 'Debarment & Mark Fail Risk' : 'Exam Eligible')}
+              </span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
+              {/* Box 1: Statutory Attendance Cutoff (75%) */}
+              <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '12px 14px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  Statutory University Attendance Cutoff
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{
+                    fontSize: 22,
+                    fontWeight: 800,
+                    fontFamily: 'var(--font-mono)',
+                    color: (profile?.exam_eligibility?.current_attendance ?? signals.attendance.current_pct) >= 75 ? '#10b981' : '#ef4444'
+                  }}>
+                    {profile?.exam_eligibility?.current_attendance ?? signals.attendance.current_pct}%
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>/ 75.0% threshold</span>
+                </div>
+                <div style={{
+                  fontSize: 11,
+                  marginTop: 4,
+                  fontWeight: 600,
+                  color: (profile?.exam_eligibility?.current_attendance ?? signals.attendance.current_pct) >= 75 ? '#10b981' : '#ef4444'
+                }}>
+                  {(profile?.exam_eligibility?.current_attendance ?? signals.attendance.current_pct) >= 75
+                    ? '✓ Above 75% — Eligible for Hall Ticket'
+                    : `⚠ ${(75 - (profile?.exam_eligibility?.current_attendance ?? signals.attendance.current_pct)).toFixed(1)}% Shortfall — Debarment Risk`}
+                </div>
+              </div>
+
+              {/* Box 2: Series Exam Mark Cutoff (45%) */}
+              <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '12px 14px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  Series Exam Mark Cutoff (Internal)
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{
+                    fontSize: 22,
+                    fontWeight: 800,
+                    fontFamily: 'var(--font-mono)',
+                    color: (profile?.exam_eligibility?.series_exam_mark ?? signals?.series_exam?.current_mark ?? 70) >= 45 ? '#10b981' : '#ef4444'
+                  }}>
+                    {profile?.exam_eligibility?.series_exam_mark ?? signals?.series_exam?.current_mark ?? 70}%
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>/ 45.0% threshold</span>
+                </div>
+                <div style={{
+                  fontSize: 11,
+                  marginTop: 4,
+                  fontWeight: 600,
+                  color: (profile?.exam_eligibility?.series_exam_mark ?? signals?.series_exam?.current_mark ?? 70) >= 45 ? '#10b981' : '#ef4444'
+                }}>
+                  {(profile?.exam_eligibility?.series_exam_mark ?? signals?.series_exam?.current_mark ?? 70) >= 45
+                    ? '✓ Above 45% Passing Mark'
+                    : `⚠ ${(45 - (profile?.exam_eligibility?.series_exam_mark ?? signals?.series_exam?.current_mark ?? 70)).toFixed(1)}% Below Series Cutoff`}
+                </div>
+              </div>
+
+              {/* Box 3: Projected CIE / Semester Exam Mark (40% pass mark) */}
+              <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '12px 14px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  Projected Continuous Internal Mark (CIE)
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{
+                    fontSize: 22,
+                    fontWeight: 800,
+                    fontFamily: 'var(--font-mono)',
+                    color: (profile?.exam_eligibility?.projected_exam_mark ?? Math.max(0, Math.round(80 - profile.dvi * 0.55))) >= 40 ? '#10b981' : '#ef4444'
+                  }}>
+                    {profile?.exam_eligibility?.projected_exam_mark ?? Math.max(0, Math.round(80 - profile.dvi * 0.55))}%
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>/ 40.0% pass cutoff</span>
+                </div>
+                <div style={{
+                  fontSize: 11,
+                  marginTop: 4,
+                  fontWeight: 600,
+                  color: (profile?.exam_eligibility?.projected_exam_mark ?? Math.max(0, Math.round(80 - profile.dvi * 0.55))) >= 40 ? '#10b981' : '#ef4444'
+                }}>
+                  {(profile?.exam_eligibility?.projected_exam_mark ?? Math.max(0, Math.round(80 - profile.dvi * 0.55))) >= 40
+                    ? '✓ Projected Passing Grade Standing'
+                    : '⚠ Critical: Below 40% Passing Threshold'}
+                </div>
+              </div>
+
+              {/* Box 4: DVI Score Exam Risk Threshold (50 Monitor / 70 Tripwire) */}
+              <div style={{ background: 'var(--bg-elevated)', borderRadius: 8, padding: '12px 14px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 4 }}>
+                  DVI Score Risk Thresholds
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{
+                    fontSize: 22,
+                    fontWeight: 800,
+                    fontFamily: 'var(--font-mono)',
+                    color: profile.dvi >= 70 ? '#ef4444' : profile.dvi >= 50 ? '#f59e0b' : '#10b981'
+                  }}>
+                    {profile.dvi}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>DVI score</span>
+                </div>
+                <div style={{
+                  fontSize: 11,
+                  marginTop: 4,
+                  fontWeight: 600,
+                  color: profile.dvi >= 70 ? '#ef4444' : profile.dvi >= 50 ? '#f59e0b' : '#10b981'
+                }}>
+                  {profile.dvi >= 70
+                    ? '🚨 DVI ≥ 70: Urgent Faculty Intervention'
+                    : profile.dvi >= 50
+                    ? '⚡ DVI ≥ 50: Exam Risk Monitoring Active'
+                    : '✓ DVI in Safe Standing (<50)'}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Statutory Criteria: University requires &ge;75% attendance for exam hall ticket, &ge;45% series exam mark, &amp; &ge;40% CIE internal mark to pass.</span>
+              <span style={{ fontStyle: 'italic' }}>Early DVI detection alerts faculty 3–4 weeks prior to semester exam lock.</span>
             </div>
           </div>
         </div>
@@ -712,7 +909,7 @@ export default function StudentProfile() {
               </div>
             </div>
             <div style={{ marginTop: 10, fontSize: 11, color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 8 }}>
-              💡 <strong>Human-in-the-Loop Integration:</strong> Provides subjective student context to corroborate telemetry drift without altering the deterministic, transparent 40/35/25 DVI weights.
+              💡 <strong>Human-in-the-Loop Integration:</strong> Provides subjective student context to corroborate telemetry drift without altering the deterministic, transparent 50/30/20 DVI weights.
             </div>
           </div>
         )}

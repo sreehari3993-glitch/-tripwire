@@ -5,7 +5,8 @@ import { StatusBadge, Spinner, LoadingScreen, HumanOverrideNote, PrototypeThresh
 import {
   ArrowLeft, Sparkles, AlertTriangle, User, MessageSquare,
   CheckCircle, Clock, TrendingDown, Shield, HelpCircle,
-  ShieldAlert, ShieldCheck, HelpCircle as QuestionIcon, PhoneCall, Calendar, Award
+  ShieldAlert, ShieldCheck, HelpCircle as QuestionIcon, PhoneCall, Calendar, Award,
+  GraduationCap
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -286,6 +287,15 @@ export default function AlertDetail() {
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 16 }}>
               Why Did Tripwire Trigger? — Component Contributions
             </div>
+            {components.series_exam && (
+              <ComponentBar
+                label="Series Exam Mark Drift"
+                score={components.series_exam.score}
+                weight={components.series_exam.weight}
+                color="#ec4899"
+                contribution={components.series_exam.contribution}
+              />
+            )}
             <ComponentBar
               label="Attendance Drift"
               score={components.attendance.score}
@@ -312,14 +322,50 @@ export default function AlertDetail() {
               display: 'flex', justifyContent: 'space-between', alignItems: 'center'
             }}>
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                DVI = {(components.attendance.weight ?? 0.50).toFixed(2)}({Math.round(components.attendance.score)}) + {(components.submission.weight ?? 0.30).toFixed(2)}({Math.round(components.submission.score)}) + {(components.engagement.weight ?? 0.20).toFixed(2)}({Math.round(components.engagement.score)})
+                DVI = {components.series_exam ? `${(components.series_exam.weight ?? 0.30).toFixed(2)}(${Math.round(components.series_exam.score)}) + ` : ''}{(components.attendance.weight ?? 0.30).toFixed(2)}({Math.round(components.attendance.score)}) + {(components.submission.weight ?? 0.30).toFixed(2)}({Math.round(components.submission.score)}) + {(components.engagement.weight ?? 0.10).toFixed(2)}({Math.round(components.engagement.score)})
               </span>
               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 900, fontSize: 18, color: dviColor }}>
                 = {Math.round(
+                  (components.series_exam?.contribution ?? 0) +
                   components.attendance.contribution +
                   components.submission.contribution +
                   components.engagement.contribution
                 )}
+              </span>
+            </div>
+
+            {/* Semester Exam Criteria & Mark Threshold Standing */}
+            <div style={{
+              borderTop: '1px solid var(--border-subtle)',
+              paddingTop: 12,
+              marginTop: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 8,
+              fontSize: 11
+            }}>
+              <div>
+                <strong style={{ color: '#f87171' }}>Academic Criteria Check:</strong>{' '}
+                <span style={{ color: 'var(--text-secondary)' }}>
+                  Series Exam Cutoff &ge;45% · Statutory Attendance &ge;75% · Passing CIE Mark &ge;40% (DVI &ge;50 flags Exam Risk)
+                </span>
+                <div style={{ color: 'var(--text-muted)', fontSize: 10, marginTop: 2 }}>
+                  {alert.exam_eligibility?.label || `DVI ${Math.round(alert.dvi_score)} exceeds risk threshold (50) — Exam Debarment & CIE Mark Fail Risk`}
+                </div>
+              </div>
+              <span style={{
+                fontSize: 10,
+                fontWeight: 700,
+                color: (alert.exam_eligibility?.is_eligible ?? (alert.dvi_score < 70)) ? '#10b981' : '#ef4444',
+                background: (alert.exam_eligibility?.is_eligible ?? (alert.dvi_score < 70)) ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
+                border: '1px solid ' + ((alert.exam_eligibility?.is_eligible ?? (alert.dvi_score < 70)) ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'),
+                padding: '3px 8px',
+                borderRadius: 4,
+                fontFamily: 'var(--font-mono)'
+              }}>
+                {(alert.exam_eligibility?.status ?? 'EXAM_RISK').toUpperCase()}
               </span>
             </div>
           </div>

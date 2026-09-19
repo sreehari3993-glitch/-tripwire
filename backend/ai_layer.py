@@ -30,10 +30,13 @@ def _rule_based_explanation(student_name: str, factors: dict, dvi: float = 77.0)
     sub  = factors.get("submission", {})
     eng  = factors.get("engagement", {})
     morn = factors.get("morning_absences", {})
+    exam = factors.get("series_exam", {})
 
     first_name = student_name.split()[0]
 
     behavioral_changes = []
+    if exam.get("delta_mark", exam.get("delta", 0)) < -5 or exam.get("is_below_threshold"):
+        behavioral_changes.append(f"Series exam mark dropped to {exam.get('current_mark', 34)}% (breaching statutory {int(exam.get('threshold', 45))}% qualifying cutoff)")
     if att.get("delta_pct", 0) < -5:
         behavioral_changes.append(f"Attendance declined from {att.get('baseline_pct', 90)}% baseline to {att.get('current_pct', 78)}% ({att.get('delta_pct', -12):+.1f}%)")
     if sub.get("delta_hrs", 0) > 5:
@@ -106,6 +109,7 @@ def generate_explanation(
         sub  = factors.get("submission", {})
         eng  = factors.get("engagement", {})
         morn = factors.get("morning_absences", {})
+        exam = factors.get("series_exam", {})
 
         prompt = f"""You are an empathetic educational decision-support assistant for a college faculty mentor.
 Your task is to summarize recent behavioral drift for student {student_name} ({section}).
@@ -113,13 +117,14 @@ Your task is to summarize recent behavioral drift for student {student_name} ({s
 CRITICAL ETHICAL RULES:
 1. Do NOT make any medical, psychological, or mental health diagnoses.
 2. Do NOT accuse, criticize, or judge the student.
-3. Focus ONLY on observable academic telemetry (attendance, submission timeliness, LMS activity).
+3. Focus ONLY on observable academic telemetry (attendance, submission timeliness, LMS activity, series exam performance).
 4. Frame all shifts relative to THIS STUDENT'S PERSONAL BASELINE (not a class average).
 5. Emphasize supportive, respectful, non-punitive mentorship.
 6. The "whatsapp_draft" MUST be a warm, casual, non-judgmental message under 45 words. It MUST NEVER mention AI, Tripwire, DVI, risk scores, or attendance percentages. It must sound like a caring teacher checking in casually about coursework and general well-being.
 
 Student Signals:
 - DVI Score: {dvi}/100 (Prototype Threshold: 70)
+- Series Exam Mark: Baseline {exam.get('baseline_mark', 75)}% → Current {exam.get('current_mark', 'N/A')}% (Cutoff: 45%)
 - Attendance: Baseline {att.get('baseline_pct', 'N/A')}% → Current {att.get('current_pct', 'N/A')}% (Change: {att.get('delta_pct', 0):+.1f}%)
 - Submission Latency: Baseline {sub.get('baseline_delay_hrs', 'N/A')} hrs → Current {sub.get('current_delay_hrs', 'N/A')} hrs (Change: {sub.get('delta_hrs', 0):+.1f} hrs)
 - LMS Activity: Baseline {eng.get('baseline_per_week', 'N/A')}/week → Current {eng.get('current_per_week', 'N/A')}/week (Change: {eng.get('delta', 0):+.1f}/week)

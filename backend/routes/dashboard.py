@@ -18,6 +18,7 @@ def get_summary(db: Session = Depends(get_db), mentor=Depends(get_current_mentor
     monitoring_count = 0
     tripwire_count   = 0
     recovering_count = 0
+    exam_risk_count  = 0
     student_ids = [s.student_id for s in students]
 
     resolved_count = (
@@ -42,6 +43,7 @@ def get_summary(db: Session = Depends(get_db), mentor=Depends(get_current_mentor
         result = compute_dvi(db, student)
         s = result["status"]
         dvi = result["dvi"]
+        exam_elig = result.get("exam_eligibility", {})
 
         if s == "tripwire":
             tripwire_count += 1
@@ -53,6 +55,9 @@ def get_summary(db: Session = Depends(get_db), mentor=Depends(get_current_mentor
             watch_count += 1
         else:
             normal_count += 1
+
+        if exam_elig.get("risk_level") in ["critical", "high"]:
+            exam_risk_count += 1
 
         if dvi <= 20:
             distribution["0_20"] += 1
@@ -69,7 +74,8 @@ def get_summary(db: Session = Depends(get_db), mentor=Depends(get_current_mentor
             "student_id": student.student_id,
             "name": student.name,
             "dvi": dvi,
-            "status": s
+            "status": s,
+            "exam_eligibility": exam_elig
         })
 
     # Recent alerts scoped to mentor's students
@@ -92,6 +98,7 @@ def get_summary(db: Session = Depends(get_db), mentor=Depends(get_current_mentor
         "monitoring": monitoring_count,
         "tripwire": tripwire_count,
         "recovering": recovering_count,
+        "exam_risk_count": exam_risk_count,
         "resolved_interventions": resolved_count,
         "distribution": distribution,
         "recent_alerts_count": len(recent_alerts),
@@ -100,6 +107,10 @@ def get_summary(db: Session = Depends(get_db), mentor=Depends(get_current_mentor
             "monitoring": 50,
             "watch": 35,
             "normal": 0,
+            "series_exam": 45,
+            "exam_attendance": 75,
+            "exam_pass_mark": 40,
+            "exam_risk_dvi": 50,
             "disclaimer": "Prototype threshold — decision-support indicator, not a diagnostic verdict."
         }
     }

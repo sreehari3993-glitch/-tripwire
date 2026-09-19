@@ -68,6 +68,8 @@ class Student(Base):
     baseline_submission_delay_hrs     = Column(Float, default=6.0)    # median hours
     baseline_lms_activity_per_week    = Column(Float, default=7.0)    # avg logins/week
     baseline_morning_absences_per_week = Column(Float, default=0.2)   # avg per week
+    baseline_series_exam_mark         = Column(Float, default=75.0)   # series exam mark baseline (0-100)
+    series_exam_mark                  = Column(Float, default=70.0)   # current series exam score (0-100)
 
     mentor       = relationship("Mentor", back_populates="students")
     attendance   = relationship("Attendance", back_populates="student")
@@ -113,9 +115,11 @@ class TripwireAlert(Base):
     student_id        = Column(String, ForeignKey("students.student_id"), nullable=False)
     dvi_score         = Column(Float, nullable=False)
     trigger_date      = Column(DateTime, nullable=False)
+    series_exam_drift = Column(Float, default=0.0)
     attendance_drift  = Column(Float, default=0.0)   # smoothed component 0–100
     submission_drift  = Column(Float, default=0.0)
     engagement_drift  = Column(Float, default=0.0)
+    raw_series_exam_drift = Column(Float, default=0.0)
     raw_attendance_drift = Column(Float, default=0.0) # raw un-smoothed drift
     raw_submission_drift = Column(Float, default=0.0)
     raw_engagement_drift = Column(Float, default=0.0)

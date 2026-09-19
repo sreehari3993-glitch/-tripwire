@@ -116,7 +116,7 @@ export function PrototypeThresholdBadge() {
       fontWeight: 500
     }}>
       <Info size={12} />
-      <span>Prototype Threshold: <strong style={{ color: '#ef4444' }}>&ge;70 Tripwire</strong> · <strong style={{ color: '#f59e0b' }}>50–69 Monitor</strong> · <strong style={{ color: '#10b981' }}>&lt;50 Normal</strong></span>
+      <span>Thresholds: <strong style={{ color: '#ef4444' }}>&ge;70 Tripwire</strong> · <strong style={{ color: '#f59e0b' }}>50–69 Monitor</strong> · <strong style={{ color: '#fb923c' }}>35–49 Watch</strong> · <strong style={{ color: '#10b981' }}>&lt;35 Normal</strong> | <strong>Series Exam Cutoff:</strong> &ge;45% | <strong>Semester Exam:</strong> &ge;75% Attendance &amp; &ge;40% Mark Cutoff</span>
     </div>
   )
 }

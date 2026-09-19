@@ -44,17 +44,68 @@ class TestDVIEngine(unittest.TestCase):
         self.db.close()
 
     def test_weights_sum_to_one(self):
-        """Weights must sum exactly to 1.0 (40% attendance + 35% submission + 25% engagement)."""
-        total = dvi_engine.W_ATTENDANCE + dvi_engine.W_SUBMISSION + dvi_engine.W_ENGAGEMENT
+        """Weights must sum exactly to 1.0 (30% series exam + 30% attendance + 30% submission + 10% engagement)."""
+        total = dvi_engine.W_SERIES_EXAM + dvi_engine.W_ATTENDANCE + dvi_engine.W_SUBMISSION + dvi_engine.W_ENGAGEMENT
         self.assertAlmostEqual(total, 1.0, places=5)
+        self.assertAlmostEqual(dvi_engine.W_SERIES_EXAM, 0.30, places=5)
+        self.assertAlmostEqual(dvi_engine.W_ATTENDANCE, 0.30, places=5)
+        self.assertAlmostEqual(dvi_engine.W_SUBMISSION, 0.30, places=5)
+        self.assertAlmostEqual(dvi_engine.W_ENGAGEMENT, 0.10, places=5)
 
     def test_threshold_constants(self):
-        """Verify standard prototype thresholds."""
+        """Verify standard prototype, series exam, and semester exam thresholds."""
         self.assertEqual(dvi_engine.THRESHOLD_TRIPWIRE, 70.0)
         self.assertEqual(dvi_engine.THRESHOLD_MONITOR, 50.0)
         self.assertEqual(dvi_engine.THRESHOLD_WATCH, 35.0)
         self.assertEqual(dvi_engine.THRESHOLD_HYSTERESIS_RECOVERY, 55.0)
         self.assertEqual(dvi_engine.THRESHOLD_HYSTERESIS_NORMAL, 40.0)
+        self.assertEqual(dvi_engine.THRESHOLD_SERIES_EXAM, 45.0)
+        self.assertEqual(dvi_engine.THRESHOLD_EXAM_PASS_MARK, 40.0)
+        self.assertEqual(dvi_engine.THRESHOLD_EXAM_ATTENDANCE, 75.0)
+        self.assertEqual(dvi_engine.THRESHOLD_EXAM_RISK_DVI, 50.0)
+
+    def test_series_exam_drift_computation(self):
+        """Verify series exam drift calculation against baseline and the 45% threshold."""
+        mock_student_passing = Student(
+            student_id="TEST_EXAM_PASS",
+            baseline_series_exam_mark=80.0,
+            series_exam_mark=75.0
+        )
+        drift_pass = dvi_engine.compute_series_exam_drift(mock_student_passing, {"series_exam": 80.0})
+        self.assertLess(drift_pass["score"], 50.0)
+        self.assertFalse(drift_pass["below_threshold"])
+
+        mock_student_failing = Student(
+            student_id="TEST_EXAM_FAIL",
+            baseline_series_exam_mark=75.0,
+            series_exam_mark=34.0
+        )
+        drift_fail = dvi_engine.compute_series_exam_drift(mock_student_failing, {"series_exam": 75.0})
+        self.assertTrue(drift_fail["below_threshold"])
+        self.assertGreater(drift_fail["score"], 70.0)
+        self.assertEqual(drift_fail["threshold"], 45.0)
+
+    def test_semester_exam_eligibility_computation(self):
+        """Verify semester exam eligibility and CIE mark projections against statutory thresholds."""
+        # Case 1: Normal student with safe standing
+        safe = dvi_engine.compute_exam_eligibility(dvi=15.0, current_att=92.0)
+        self.assertTrue(safe["is_eligible"])
+        self.assertTrue(safe["is_attendance_eligible"])
+        self.assertTrue(safe["is_marks_eligible"])
+        self.assertGreaterEqual(safe["projected_exam_mark"], 40.0)
+        self.assertEqual(safe["risk_level"], "safe")
+
+        # Case 2: Attendance debarment risk (< 75%)
+        att_risk = dvi_engine.compute_exam_eligibility(dvi=45.0, current_att=71.0)
+        self.assertFalse(att_risk["is_attendance_eligible"])
+        self.assertEqual(att_risk["attendance_shortfall"], 4.0)
+        self.assertEqual(att_risk["risk_level"], "high")
+
+        # Case 3: Critical dual risk (tripwire DVI + attendance < 75%)
+        crit = dvi_engine.compute_exam_eligibility(dvi=78.0, current_att=68.0)
+        self.assertFalse(crit["is_eligible"])
+        self.assertEqual(crit["risk_level"], "critical")
+        self.assertEqual(crit["status"], "critical_dual_risk")
 
     def test_bayesian_cold_start_blending_zero_weeks(self):
         """Student with 0 weeks of data should fully blend with cohort medians."""

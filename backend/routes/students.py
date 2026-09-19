@@ -15,7 +15,7 @@ from routes.auth import get_current_mentor
 from routes.access import get_owned_student
 from dvi_engine import (
     compute_dvi, compute_dvi_history, compute_counterfactual,
-    W_ATTENDANCE, W_SUBMISSION, W_ENGAGEMENT
+    W_ATTENDANCE, W_SUBMISSION, W_ENGAGEMENT, W_SERIES_EXAM, THRESHOLD_SERIES_EXAM
 )
 
 from typing import Optional, List
@@ -33,6 +33,13 @@ class StudentCreateRequest(BaseModel):
     baseline_attendance: Optional[float] = 85.0
     baseline_submission_delay_hrs: Optional[float] = 6.0
     baseline_lms_activity_per_week: Optional[float] = 7.0
+    baseline_series_exam_mark: Optional[float] = 75.0
+    series_exam_mark: Optional[float] = 70.0
+
+
+class SeriesExamLogRequest(BaseModel):
+    series_exam_mark: float
+    baseline_series_exam_mark: Optional[float] = None
 
 
 class AttendanceLogRequest(BaseModel):
@@ -97,6 +104,8 @@ def recalculate_and_check_alerts(db: Session, student: Student) -> dict:
     alert_id = None
 
     if new_dvi >= 70.0:
+        exam_drift = dvi_data["components"].get("series_exam", {}).get("score", 0.0)
+        raw_exam_drift = dvi_data["components"].get("series_exam", {}).get("raw_score", exam_drift)
         if not existing_alert:
             new_alert = TripwireAlert(
                 student_id=student.student_id,
@@ -105,11 +114,18 @@ def recalculate_and_check_alerts(db: Session, student: Student) -> dict:
                 attendance_drift=dvi_data["components"]["attendance"]["score"],
                 submission_drift=dvi_data["components"]["submission"]["score"],
                 engagement_drift=dvi_data["components"]["engagement"]["score"],
+                series_exam_drift=exam_drift,
+                raw_attendance_drift=dvi_data["components"]["attendance"].get("raw_score", dvi_data["components"]["attendance"]["score"]),
+                raw_submission_drift=dvi_data["components"]["submission"].get("raw_score", dvi_data["components"]["submission"]["score"]),
+                raw_engagement_drift=dvi_data["components"]["engagement"].get("raw_score", dvi_data["components"]["engagement"]["score"]),
+                raw_series_exam_drift=raw_exam_drift,
                 raw_dvi_score=dvi_data.get("raw_dvi", new_dvi),
                 reason_json=json.dumps({
                     "attendance_delta_pct": dvi_data["components"]["attendance"].get("delta_pct", 0.0),
                     "submission_delta_hrs": dvi_data["components"]["submission"].get("delta_hrs", 0.0),
                     "engagement_delta": dvi_data["components"]["engagement"].get("delta", 0.0),
+                    "series_exam_delta": dvi_data["components"].get("series_exam", {}).get("delta", 0.0),
+                    "series_exam_mark": dvi_data["components"].get("series_exam", {}).get("current_mark", 70.0),
                     "auto_generated": True
                 }),
                 status="active",
@@ -125,6 +141,11 @@ def recalculate_and_check_alerts(db: Session, student: Student) -> dict:
             existing_alert.attendance_drift = dvi_data["components"]["attendance"]["score"]
             existing_alert.submission_drift = dvi_data["components"]["submission"]["score"]
             existing_alert.engagement_drift = dvi_data["components"]["engagement"]["score"]
+            existing_alert.series_exam_drift = exam_drift
+            existing_alert.raw_attendance_drift = dvi_data["components"]["attendance"].get("raw_score", dvi_data["components"]["attendance"]["score"])
+            existing_alert.raw_submission_drift = dvi_data["components"]["submission"].get("raw_score", dvi_data["components"]["submission"]["score"])
+            existing_alert.raw_engagement_drift = dvi_data["components"]["engagement"].get("raw_score", dvi_data["components"]["engagement"]["score"])
+            existing_alert.raw_series_exam_drift = raw_exam_drift
             existing_alert.raw_dvi_score = dvi_data.get("raw_dvi", new_dvi)
             db.commit()
             alert_id = existing_alert.alert_id
@@ -174,6 +195,7 @@ def _student_summary(db: Session, student: Student) -> dict:
         "attendance": f"{comps['attendance']['current_pct']:.0f}%",
         "assignment_delay": f"{comps['submission']['current_delay_hrs']:.0f}h",
         "lms_engagement": f"{comps['engagement']['current_per_week']:.0f}/wk",
+        "series_exam": f"{comps.get('series_exam', {}).get('current_mark', getattr(student, 'series_exam_mark', 70.0) or 70.0):.0f}%",
         "dvi": result["dvi"],
         "raw_dvi": result.get("raw_dvi", result["dvi"]),
         "status": result["status"],
@@ -183,7 +205,8 @@ def _student_summary(db: Session, student: Student) -> dict:
         "is_cold_start": result.get("is_cold_start", False),
         "pulse": pulse_info,
         "last_activity": last_act_str,
-        "alert_id": active_alert.alert_id if active_alert else None
+        "alert_id": active_alert.alert_id if active_alert else None,
+        "exam_eligibility": result.get("exam_eligibility", {})
     }
 
 
@@ -257,6 +280,8 @@ def create_student(
         baseline_attendance=body.baseline_attendance or 85.0,
         baseline_submission_delay_hrs=body.baseline_submission_delay_hrs or 6.0,
         baseline_lms_activity_per_week=body.baseline_lms_activity_per_week or 7.0,
+        baseline_series_exam_mark=body.baseline_series_exam_mark or 75.0,
+        series_exam_mark=body.series_exam_mark or 70.0,
         baseline_confidence="Established"
     )
     db.add(student)
@@ -331,6 +356,8 @@ def import_students_csv(
             baseline_attendance=85.0,
             baseline_submission_delay_hrs=6.0,
             baseline_lms_activity_per_week=7.0,
+            baseline_series_exam_mark=75.0,
+            series_exam_mark=70.0,
             baseline_confidence="Established"
         )
         db.add(student)
@@ -495,7 +522,7 @@ def get_student_profile(
 
     result = compute_dvi(db, student)
     comps  = result["components"]
-    weights = result.get("weights", {"attendance": W_ATTENDANCE, "submission": W_SUBMISSION, "engagement": W_ENGAGEMENT})
+    weights = result.get("weights", {"series_exam": W_SERIES_EXAM, "attendance": W_ATTENDANCE, "submission": W_SUBMISSION, "engagement": W_ENGAGEMENT})
 
     active_alert = db.query(TripwireAlert).filter(
         TripwireAlert.student_id == student_id,
@@ -506,6 +533,10 @@ def get_student_profile(
     cf_analysis = compute_counterfactual(db, student)
 
     # What Changed comparison block
+    current_series = comps.get("series_exam", {}).get("current_mark", getattr(student, "series_exam_mark", 70.0) or 70.0)
+    baseline_series = getattr(student, "baseline_series_exam_mark", 75.0) or 75.0
+    series_delta = round(current_series - baseline_series, 1)
+
     att_pct_change = round(comps["attendance"]["delta_pct"], 1)
     sub_hrs_change = round(comps["submission"]["delta_hrs"], 1)
     lms_pct_change = round(
@@ -514,6 +545,17 @@ def get_student_profile(
     )
 
     what_changed = {
+        "series_exam": {
+            "label": "Series Exam Mark",
+            "baseline": baseline_series,
+            "current": current_series,
+            "change": series_delta,
+            "formatted_change": f"{series_delta:+.1f}%",
+            "unit": "%",
+            "threshold": THRESHOLD_SERIES_EXAM,
+            "below_threshold": current_series < THRESHOLD_SERIES_EXAM,
+            "negative": series_delta < -5 or current_series < THRESHOLD_SERIES_EXAM
+        },
         "attendance": {
             "label": "Attendance Rate",
             "baseline": student.baseline_attendance,
@@ -581,12 +623,14 @@ def get_student_profile(
         "hysteresis": result.get("hysteresis", {}),
         "pulse": pulse_info,
         "baselines": {
+            "series_exam_mark": getattr(student, "baseline_series_exam_mark", 75.0) or 75.0,
             "attendance_pct": student.baseline_attendance,
             "submission_delay_hrs": student.baseline_submission_delay_hrs,
             "lms_per_week": student.baseline_lms_activity_per_week,
             "morning_absences_per_week": student.baseline_morning_absences_per_week
         },
         "signals": {
+            "series_exam": comps.get("series_exam", {}),
             "attendance": comps["attendance"],
             "submission": comps["submission"],
             "engagement": comps["engagement"],
@@ -596,10 +640,13 @@ def get_student_profile(
         "counterfactual": cf_analysis,
         "weights": weights,
         "dvi_breakdown": {
+            "series_exam_component": round(comps.get("series_exam", {}).get("score", 0.0) * weights.get("series_exam", W_SERIES_EXAM), 1),
             "attendance_component": round(comps["attendance"]["score"] * weights.get("attendance", W_ATTENDANCE), 1),
             "submission_component": round(comps["submission"]["score"] * weights.get("submission", W_SUBMISSION), 1),
             "engagement_component": round(comps["engagement"]["score"] * weights.get("engagement", W_ENGAGEMENT), 1),
         },
+        "exam_eligibility": result.get("exam_eligibility", {}),
+        "academic_thresholds": result.get("academic_thresholds", {}),
         "excused_leaves": excused_leaves,
         "alert_id": active_alert.alert_id if active_alert else None
     }
@@ -746,6 +793,31 @@ def log_student_lms(
         "status": recalc["status"],
         "alert_created": recalc["alert_created"],
         "alert_id": recalc["alert_id"]
+    }
+
+
+@router.post("/{student_id}/series-exam")
+def log_student_series_exam(
+    student_id: str,
+    body: SeriesExamLogRequest,
+    db: Session = Depends(get_db),
+    mentor=Depends(get_current_mentor)
+):
+    """Updates student series exam mark and recalculates DVI."""
+    student = get_owned_student(db, student_id, mentor)
+    student.series_exam_mark = max(0.0, min(100.0, body.series_exam_mark))
+    if body.baseline_series_exam_mark is not None:
+        student.baseline_series_exam_mark = max(0.0, min(100.0, body.baseline_series_exam_mark))
+    db.commit()
+    recalc = recalculate_and_check_alerts(db, student)
+    return {
+        "success": True,
+        "message": f"Series exam mark updated to {student.series_exam_mark}%.",
+        "dvi": recalc["dvi"],
+        "status": recalc["status"],
+        "alert_created": recalc["alert_created"],
+        "alert_id": recalc["alert_id"],
+        "series_exam_mark": student.series_exam_mark
     }
 
 
@@ -1050,6 +1122,9 @@ def simulate_student_drift(
     student.weekly_pulse_note = "Simulated: Struggling with concurrent lab deadlines and morning commute"
     student.weekly_pulse_date = today
 
+    # 4b. Drop series exam mark below 45% threshold
+    student.series_exam_mark = 34.0
+
     # Ensure prior drift anchor exists so EWMA models a sustained multi-week crisis for any student
     prev_alert = db.query(TripwireAlert).filter(
         TripwireAlert.student_id == student.student_id
@@ -1064,9 +1139,11 @@ def simulate_student_drift(
                 attendance_drift=75.0,
                 submission_drift=75.0,
                 engagement_drift=70.0,
+                series_exam_drift=75.0,
                 raw_attendance_drift=75.0,
                 raw_submission_drift=75.0,
                 raw_engagement_drift=70.0,
+                raw_series_exam_drift=75.0,
                 raw_dvi_score=74.0,
                 reason_json=json.dumps({"sim_anchor": True, "auto_generated": True}),
                 status="active"
@@ -1076,9 +1153,11 @@ def simulate_student_drift(
             prev_alert.attendance_drift = 75.0
             prev_alert.submission_drift = 75.0
             prev_alert.engagement_drift = 70.0
+            prev_alert.series_exam_drift = 75.0
             prev_alert.raw_attendance_drift = 75.0
             prev_alert.raw_submission_drift = 75.0
             prev_alert.raw_engagement_drift = 70.0
+            prev_alert.raw_series_exam_drift = 75.0
             prev_alert.status = "active"
 
     db.commit()
@@ -1142,10 +1221,14 @@ def simulate_student_recovery(
         active_alert.attendance_drift = 0.0
         active_alert.submission_drift = 0.0
         active_alert.engagement_drift = 0.0
+        active_alert.series_exam_drift = 0.0
         active_alert.raw_attendance_drift = 0.0
         active_alert.raw_submission_drift = 0.0
         active_alert.raw_engagement_drift = 0.0
+        active_alert.raw_series_exam_drift = 0.0
         active_alert.dvi_score = 45.0
+
+    student.series_exam_mark = 74.0
 
     # 2. Inject positive attendance rebound (all present for last 14 days)
     for i in range(1, 15):

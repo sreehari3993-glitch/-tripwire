@@ -55,6 +55,7 @@ def list_alerts(
             "attendance_drift": alert.attendance_drift,
             "submission_drift": alert.submission_drift,
             "engagement_drift": alert.engagement_drift,
+            "series_exam_drift": getattr(alert, "series_exam_drift", 0.0) or 0.0,
             "reason": reason
         })
 
@@ -130,7 +131,11 @@ def mark_alert_read(
     return {"success": True, "alert_id": alert.alert_id, "is_read": True}
 
 
-from dvi_engine import compute_counterfactual, compute_dvi, W_ATTENDANCE, W_SUBMISSION, W_ENGAGEMENT
+from dvi_engine import (
+    compute_counterfactual, compute_dvi, compute_exam_eligibility,
+    W_ATTENDANCE, W_SUBMISSION, W_ENGAGEMENT, W_SERIES_EXAM,
+    THRESHOLD_SERIES_EXAM, THRESHOLD_EXAM_PASS_MARK, THRESHOLD_EXAM_ATTENDANCE, THRESHOLD_EXAM_RISK_DVI
+)
 
 @router.get("/{alert_id}")
 def get_alert(
@@ -150,10 +155,20 @@ def get_alert(
 
     reason = json.loads(alert.reason_json) if alert.reason_json else {}
 
-    # Calculate counterfactual analysis for this student
+    # Calculate counterfactual analysis and exam eligibility for this student
     counterfactual = compute_counterfactual(db, student) if student else None
+    dvi_data = compute_dvi(db, student) if student else None
+    exam_elig = dvi_data["exam_eligibility"] if dvi_data else compute_exam_eligibility(alert.dvi_score, 70.0)
 
     # Calculate exact point contributions
+    series_drift = getattr(alert, "series_exam_drift", None)
+    if series_drift is None or series_drift == 0.0:
+        if dvi_data and "series_exam" in dvi_data.get("components", {}):
+            series_drift = dvi_data["components"]["series_exam"]["score"]
+        else:
+            series_drift = 0.0
+    series_contrib = round(series_drift * W_SERIES_EXAM, 1)
+
     att_contrib = round(alert.attendance_drift * W_ATTENDANCE, 1)
     sub_contrib = round(alert.submission_drift * W_SUBMISSION, 1)
     eng_contrib = round(alert.engagement_drift * W_ENGAGEMENT, 1)
@@ -185,6 +200,11 @@ def get_alert(
         "is_read": True,
         "prototype_threshold": 70,
         "components": {
+            "series_exam": {
+                "score": round(series_drift, 1),
+                "weight": W_SERIES_EXAM,
+                "contribution": series_contrib
+            },
             "attendance": {
                 "score": round(alert.attendance_drift, 1),
                 "weight": W_ATTENDANCE,
@@ -204,6 +224,7 @@ def get_alert(
         "reason": reason,
         "counterfactual": counterfactual,
         "baselines": {
+            "series_exam_mark": getattr(student, "baseline_series_exam_mark", 75.0) if student else None,
             "attendance_pct": student.baseline_attendance if student else None,
             "submission_delay_hrs": student.baseline_submission_delay_hrs if student else None,
             "lms_per_week": student.baseline_lms_activity_per_week if student else None
@@ -215,7 +236,8 @@ def get_alert(
             "date": student.weekly_pulse_date.isoformat() if student.weekly_pulse_date else None
         } if (student and student.weekly_pulse_score) else None,
         "feedback": feedback_data,
-        "threshold_label": "Prototype threshold: DVI >= 70 (TRIPWIRE)"
+        "exam_eligibility": exam_elig,
+        "threshold_label": f"Prototype threshold: DVI >= 70 (TRIPWIRE) · Series Exam Cutoff: {int(THRESHOLD_SERIES_EXAM)}% · Semester Exam Cutoffs: 75% Attendance / 40% Pass Mark"
     }
 
 
